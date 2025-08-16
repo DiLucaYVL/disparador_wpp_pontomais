@@ -11,12 +11,6 @@
 - [Arquitetura](#arquitetura)
 - [Instalação](#instalação)
 - [Uso](#uso)
-- [Testes](#testes)
-- [Roadmap](#roadmap)
-- [Contribuindo](#contribuindo)
-- [Licença](#licença)
-- [Contato](#contato)
-- [Agradecimentos](#agradecimentos)
 
 ## Descrição
 
