@@ -34,9 +34,11 @@ export async function verificarStatusWhatsapp() {
         const statusData = await statusRes.json();
         const state = statusData.instance?.state?.toUpperCase();
 
-        console.log("📡 Status Evolution:", state);
-        console.log("📋 Status completo:", statusData);
-
+        if (state !="OPEN" && state !="CONNECTING") {
+            console.log("📡 Status Evolution:", state);
+            console.log("📋 Status completo:", statusData);
+        }
+        
         if (state === "CLOSE" || !state) {
             nomeElem.textContent = "🔄 Instância parada. Conectando...";
             numeroElem.textContent = "";
@@ -52,20 +54,8 @@ export async function verificarStatusWhatsapp() {
                 method: "GET",
                 headers: _getHeaders(token)
             });
-            return;
+            return "CLOSE";
         }
-
-        /*if (state === "CONNECTING") {
-            nomeElem.textContent = "⏳ Conectando ao WhatsApp...";
-            numeroElem.textContent = "";
-            fotoElem.src = "";
-            qrContainer.style.display = "none";
-
-            mainContent.classList.add('hidden');
-            connectionMessage.classList.remove('hidden');
-            logoutSection.classList.add('hidden');
-            return;
-        } */
 
         if (state === "CONNECTING") {
             nomeElem.textContent = "📷 Escaneie o QR Code para conectar.";
@@ -95,8 +85,8 @@ export async function verificarStatusWhatsapp() {
             connectionMessage.classList.remove('hidden');
             logoutSection.classList.add('hidden');
 
-            console.log("🟢 QR Code solicitado");
-            return;
+            // console.log("🟢 QR Code solicitado");
+            return "CONNECTING";
         }
 
         if (state === "OPEN") {
@@ -132,7 +122,7 @@ export async function verificarStatusWhatsapp() {
 
             } catch (profileError) {
                 console.warn("Erro ao obter dados da instância:", profileError);
-                nomeElem.textContent = `🟢 ${profileName}`;
+                nomeElem.textContent = `🟢 Conectado`;
                 numeroElem.textContent = `📞 ${instance}`;
                 fotoElem.src = "";
                 fotoElem.style.display = "none";
@@ -143,21 +133,24 @@ export async function verificarStatusWhatsapp() {
             mainContent.classList.remove('hidden');
             connectionMessage.classList.add('hidden');
             logoutSection.classList.remove('hidden');
-            return;
+            return "OPEN";
         }
 
+        // Estado desconhecido - apenas se não for nenhum dos estados conhecidos
+        if (state !== "CLOSE" && state !== "CONNECTING" && state !== "OPEN") {
+            nomeElem.textContent = "⚠️ Instância em estado indefinido.";
+            numeroElem.textContent = `Status: ${state}`;
+            fotoElem.src = "";
+            fotoElem.style.display = "none";
+            fotoElem.parentElement.querySelector('.avatar-placeholder').style.display = "flex";
+            qrContainer.style.display = "none";
 
-        // Estado desconhecido
-        nomeElem.textContent = "⚠️ Instância em estado indefinido.";
-        numeroElem.textContent = `Status: ${state}`;
-        fotoElem.src = "";
-        fotoElem.style.display = "none";
-        fotoElem.parentElement.querySelector('.avatar-placeholder').style.display = "flex";
-        qrContainer.style.display = "none";
+            mainContent.classList.add('hidden');
+            connectionMessage.classList.remove('hidden');
+            logoutSection.classList.add('hidden');
 
-        mainContent.classList.add('hidden');
-        connectionMessage.classList.remove('hidden');
-        logoutSection.classList.add('hidden');
+            return "ESTADO DESCONHECIDO: " +state;
+        }
 
     } catch (err) {
         console.error("❌ Erro ao consultar status do WhatsApp:", err);
@@ -171,6 +164,8 @@ export async function verificarStatusWhatsapp() {
         mainContent.classList.add('hidden');
         connectionMessage.classList.remove('hidden');
         logoutSection.classList.add('hidden');
+
+        return "ERROR";
     }
 }
 

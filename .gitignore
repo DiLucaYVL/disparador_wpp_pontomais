@@ -6,6 +6,7 @@ __pycache__/
 uploads/
 nginx.conf
 config.json
+static\config.json
 
 # Logs e relatórios
 logs
