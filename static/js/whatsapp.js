@@ -1,5 +1,19 @@
 // IMPORTAÇÃO ATUALIZADA
 import { carregarConfig } from './config.js';
+// Controle de timeout para requisições
+const REQUEST_TIMEOUT = 10000; // 10 segundos
+
+function createRequestWithTimeout(url, options = {}) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+    
+    return fetch(url, {
+        ...options,
+        signal: controller.signal
+    }).finally(() => {
+        clearTimeout(timeoutId);
+    });
+}
 
 function _getHeaders(token) {
     return {
@@ -23,7 +37,7 @@ export async function verificarStatusWhatsapp() {
 
     try {
         // Consulta o status da conexão
-        const statusRes = await fetch(`${api_url}/instance/connectionState/${instance}`, {
+        const statusRes = await createRequestWithTimeout(`${api_url}/instance/connectionState/${instance}`, {
             headers: _getHeaders(token)
         });
         
@@ -39,32 +53,30 @@ export async function verificarStatusWhatsapp() {
             console.log("📋 Status completo:", statusData);
         }
         
-        if (state === "CLOSE" || !state) {
-            nomeElem.textContent = "🔄 Instância parada. Conectando...";
-            numeroElem.textContent = "";
+       /* if (state === "CLOSE" || !state) {
+            nomeElem.textContent = "🔴 WhatsApp desconectado";
+            numeroElem.textContent = "Escaneie o QR Code para conectar";
             fotoElem.src = "";
+            fotoElem.style.display = "none";
+            fotoElem.parentElement.querySelector('.avatar-placeholder').style.display = "flex";
             qrContainer.style.display = "none";
 
             mainContent.classList.add('hidden');
             connectionMessage.classList.remove('hidden');
             logoutSection.classList.add('hidden');
 
-            // Tenta conectar a instância
-            await fetch(`${api_url}/instance/connect/${instance}`, { 
-                method: "GET",
-                headers: _getHeaders(token)
-            });
+            // NÃO fazer reconexão automática - deixar manual
             return "CLOSE";
-        }
+        }*/
 
-        if (state === "CONNECTING") {
+        if (state === "CONNECTING" || state === "CLOSE" ) {
             nomeElem.textContent = "📷 Escaneie o QR Code para conectar.";
             numeroElem.textContent = "";
             fotoElem.src = "";
 
             // Para Evolution API, o QR code é obtido via endpoint específico
             try {
-                const qrRes = await fetch(`${api_url}/instance/connect/${instance}`, {
+                const qrRes = await createRequestWithTimeout(`${api_url}/instance/connect/${instance}`, {
                     headers: _getHeaders(token)
                 });
                 const qrData = await qrRes.json();
@@ -92,7 +104,7 @@ export async function verificarStatusWhatsapp() {
         if (state === "OPEN") {
             try {
                 // Busca dados completos da instância
-                const instanceRes = await fetch(`${api_url}/instance/fetchInstances?instanceName=${instance}`, {
+                const instanceRes = await createRequestWithTimeout(`${api_url}/instance/fetchInstances?instanceName=${instance}`, {
                     headers: _getHeaders(token)
                 });
 
@@ -178,7 +190,7 @@ export async function fazerLogoutWhatsapp() {
         logoutButton.disabled = true;
         logoutButton.innerHTML = '<span class="logout-icon">⏳</span><span class="logout-text">Desconectando...</span>';
 
-        const response = await fetch(`${api_url}/instance/logout/${instance}`, {
+        const response = await createRequestWithTimeout(`${api_url}/instance/logout/${instance}`, {
             method: "DELETE",
             headers: _getHeaders(token)
         });
