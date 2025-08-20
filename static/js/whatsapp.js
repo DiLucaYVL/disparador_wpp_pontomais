@@ -110,13 +110,13 @@ export async function verificarStatusWhatsapp() {
 
                 if (!instanceRes.ok) throw new Error("Erro ao buscar dados da instância");
 
-                const instanceData = await instanceRes.json();
-                const inst = instanceData.instance;
+                const list = await instanceRes.json();
+                const inst = Array.isArray(list) ? list[0] : list;
 
                 // Extrai dados
                 const profileName = inst?.profileName || 'Usuário';
-                const ownerNumber = inst?.owner?.split('@')[0] || instance;
-                const profilePictureUrl = inst?.profilePictureUrl || null;
+                const ownerNumber = (inst?.ownerJid || '').split('@')[0] || instance;
+                const profilePictureUrl = inst?.profilePicUrl || null;
 
                 // Preenche na interface
                 nomeElem.textContent = `🟢 ${profileName}`;
