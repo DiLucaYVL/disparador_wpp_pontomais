@@ -114,7 +114,7 @@ export async function verificarStatusWhatsapp() {
                 const inst = Array.isArray(list) ? list[0] : list;
 
                 // Extrai dados
-                const profileName = inst?.profileName || 'Usuário';
+                const profileName = inst?.profileName || "Ponto | DP";
                 const ownerNumber = (inst?.ownerJid || '').split('@')[0] || instance;
                 const profilePictureUrl = inst?.profilePicUrl || null;
 
