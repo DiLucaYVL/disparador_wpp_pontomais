@@ -11,13 +11,13 @@ with open(config_path, "r", encoding="utf-8") as f:
 
 EVOLUTION_URL = config["EVOLUTION_URL"]
 EVOLUTION_INSTANCE = config["EVOLUTION_INSTANCE"]
-EVOLUTION_SESSION_TOKEN = config.get("EVOLUTION_SESSION_TOKEN", "")
+EVOLUTION_TOKEN = config.get("EVOLUTION_TOKEN", "")
 
 def _get_headers():
     """Retorna os headers padrão para as requisições"""
     return {
         "Content-Type": "application/json",
-        "apikey": EVOLUTION_SESSION_TOKEN
+        "apikey": EVOLUTION_TOKEN
     }
 
 def enviar_whatsapp(numero, mensagem, equipe=None):
@@ -26,13 +26,8 @@ def enviar_whatsapp(numero, mensagem, equipe=None):
     
     payload = {
         "number": numero_formatado,
-        "textMessage": {
-            "text": mensagem
-        },
-        "options": {
-            "delay": 50,                # Delay antes do envio (ms)
-            "presence": "composing"     # Mostra como "digitando..."
-        }
+        "text": mensagem,
+        "delay": 50                # Delay antes do envio (ms)
     }
 
     try:
