@@ -29,3 +29,5 @@ export function atualizarBarraProgresso(percent) {
     document.getElementById("progressBar").style.display = "block";
     document.getElementById("progressFill").style.width = percent;
 }
+
+window.mostrarLogs = mostrarLogs;
