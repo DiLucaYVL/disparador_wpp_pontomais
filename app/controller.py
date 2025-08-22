@@ -1,6 +1,7 @@
 from app.processamento.csv_reader import carregar_dados
 from app.whatsapp.mensagem import gerar_mensagens
 from app.whatsapp.enviar_mensagem import enviar_whatsapp
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.whatsapp.numeros_equipes import carregar_numeros_equipes
 from app.processamento.log import configurar_log
 from app.processamento.mapear_gerencia import eh_loja
@@ -44,55 +45,61 @@ def processar_csv(caminho_csv, ignorar_sabados, tipo_relatorio, equipes_selecion
         equipe = equipe_match.iloc[0]
         mensagens_por_equipe_data[equipe][data].append(mensagem)
 
-    for equipe, datas in sorted(mensagens_por_equipe_data.items()):
-        equipe_normalizada = str(equipe).strip().upper()
-        if equipes_selecionadas:
-            equipes_normalizadas = {e.strip().upper() for e in equipes_selecionadas}
-            if equipe_normalizada not in equipes_normalizadas:
+    futures = {}
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for equipe, datas in sorted(mensagens_por_equipe_data.items()):
+            equipe_normalizada = str(equipe).strip().upper()
+            if equipes_selecionadas:
+                equipes_normalizadas = {e.strip().upper() for e in equipes_selecionadas}
+                if equipe_normalizada not in equipes_normalizadas:
+                    continue
+
+            numero = numero_equipe.get(equipe_normalizada)
+            if not numero or numero.strip().lower() in ["nan", "none", ""]:
+                equipes_sem_numero.append(equipe)
+                stats["erro"] += 1
                 continue
 
-        numero = numero_equipe.get(equipe_normalizada)
-        if not numero or numero.strip().lower() in ["nan", "none", ""]:
-            equipes_sem_numero.append(equipe)
-            stats["erro"] += 1
-            continue
+            mensagens_sub = datas
+            datas_sub = defaultdict(list)
 
-        mensagens_sub = datas
-        datas_sub = defaultdict(list)
+            for data, mensagens in mensagens_sub.items():
+                mensagens_validas = [m for m in mensagens if m and isinstance(m, str)]
+                if mensagens_validas:
+                    datas_sub[data].extend(mensagens_validas)
 
-        for data, mensagens in mensagens_sub.items():
-            mensagens_validas = [m for m in mensagens if m and isinstance(m, str)]
-            if mensagens_validas:
-                datas_sub[data].extend(mensagens_validas)
-
-
-        if not datas_sub:
-            continue
-
-        #Define o título da mensagem se é equipe ou loja    
-        equipe_original = df[df["EquipeTratada"] == equipe_normalizada]["Equipe"].iloc[0]
-        titulo = f"LOJA {equipe}" if eh_loja(equipe_original) else f"{equipe}"
-        mensagem_final = f"*{titulo}*\n\n"
-
-        for data in sorted(datas_sub.keys(), key=lambda d: datetime.strptime(d, "%d/%m/%Y")):
-            mensagens_validas = [m.strip() for m in datas_sub[data] if m and m.strip()]
-            if not mensagens_validas:
+            if not datas_sub:
                 continue
-            mensagem_final += f"*NO DIA {data}:*\n"
-            for m in mensagens_validas:
-                mensagem_final += f"• {m}\n"
-            mensagem_final += "\n"
 
+            equipe_original = df[df["EquipeTratada"] == equipe_normalizada]["Equipe"].iloc[0]
+            titulo = f"LOJA {equipe}" if eh_loja(equipe_original) else f"{equipe}"
+            mensagem_final = f"*{titulo}*\n\n"
+
+            for data in sorted(datas_sub.keys(), key=lambda d: datetime.strptime(d, "%d/%m/%Y")):
+                mensagens_validas = [m.strip() for m in datas_sub[data] if m and m.strip()]
+                if not mensagens_validas:
+                    continue
+                mensagem_final += f"*NO DIA {data}:*\n"
+                for m in mensagens_validas:
+                    mensagem_final += f"• {m}\n"
+                mensagem_final += "\n"
+
+            future = executor.submit(
+                enviar_whatsapp, numero, mensagem_final.strip(), equipe
+            )
+            futures[future] = titulo
+            stats["total"] += 1
+            stats["equipes"].add(equipe)
+
+    for future in as_completed(futures):
+        titulo = futures[future]
         try:
-            enviar_whatsapp(numero, mensagem_final.strip(), equipe)
+            future.result()
             logs.append({"type": "success", "message": f" Mensagem enviada para {titulo}"})
             stats["sucesso"] += 1
         except Exception as e:
             logs.append({"type": "error", "message": f" Erro ao enviar para {titulo}: {str(e)}"})
             stats["erro"] += 1
-
-        stats["total"] += 1
-        stats["equipes"].add(equipe)
 
     if equipes_sem_numero:
         logs.append({"type": "warning", "message": f" Números não encontrados para: {', '.join(equipes_sem_numero)}"})
