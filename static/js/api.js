@@ -1,22 +1,16 @@
-import { mostrarLogs } from './ui.js';
-import { 
-    obterMensagemErroDetalhada, 
-    processarRespostaHTTP, 
+import {
+    obterMensagemErroDetalhada,
+    processarRespostaHTTP,
     tratarErroCompleto,
-    categorizarErro 
+    categorizarErro
 } from './mapear-erro.js';
 
 /**
  * Envia CSV para processamento no servidor
  * @param {FormData} formData - Dados do formulário incluindo arquivo CSV
- * @returns {Promise<Object>} Resposta do servidor
+ * @returns {Promise<string>} task_id retornado pelo servidor
  */
 export async function enviarCSV(formData) {
-    const botao = document.getElementById('sendButton');
-    botao.disabled = true;
-
-    mostrarLogs([{ type: "info", message: "🚀 Envio iniciado. Processando o arquivo..." }]);
-
     try {
         const res = await fetch('/enviar', {
             method: 'POST',
@@ -26,42 +20,32 @@ export async function enviarCSV(formData) {
         // Processa erros HTTP primeiro
         const erroHTTP = await processarRespostaHTTP(res);
         if (erroHTTP) {
-            mostrarLogs([{ type: "error", message: erroHTTP }]);
-            
-            // Log adicional para desenvolvedores (console)
             console.error(`Erro HTTP ${res.status}:`, {
                 status: res.status,
                 statusText: res.statusText,
                 url: res.url,
                 mensagem: erroHTTP
             });
-            
+
             throw new Error(erroHTTP);
         }
 
         // Se chegou até aqui, tenta parsear JSON
         const data = await res.json();
-        
+
         // Verifica se o servidor retornou sucesso
-        if (!data.success) {
-            if (data.log && Array.isArray(data.log)) {
-                mostrarLogs(data.log);
-            } else {
-                mostrarLogs([{ type: "error", message: "❌ Servidor retornou erro sem detalhes." }]);
-            }
-            throw new Error("Servidor retornou erro");
+        if (!data.success || !data.task_id) {
+            throw new Error('Erro ao agendar processamento');
         }
-        
-        return data;
-        
+
+        return data.task_id;
+
     } catch (error) {
         // Se ainda não foi mostrado erro, processa com o sistema de mapeamento
-        if (!error.message.includes('HTTP') && !error.message.includes('Servidor retornou erro')) {
+        if (!error.message.includes('HTTP')) {
             const mensagemDetalhada = obterMensagemErroDetalhada(error);
             const categoria = categorizarErro(error);
-            
-            mostrarLogs([{ type: "error", message: mensagemDetalhada }]);
-            
+
             // Log técnico para desenvolvedores
             console.error('Erro detalhado na comunicação:', {
                 categoria,
@@ -70,12 +54,26 @@ export async function enviarCSV(formData) {
                 stack: error.stack,
                 timestamp: new Date().toISOString()
             });
+
+            throw new Error(mensagemDetalhada);
         }
-        
+
         throw error;
-    } finally {
-        botao.disabled = false;
     }
+}
+
+/**
+ * Consulta o status de uma tarefa
+ * @param {string} taskId - ID da tarefa retornado pelo servidor
+ * @returns {Promise<Object>} Dados de status/resultados
+ */
+export async function obterStatus(taskId) {
+    const res = await fetch(`/status/${taskId}`);
+    const erroHTTP = await processarRespostaHTTP(res);
+    if (erroHTTP) {
+        throw new Error(erroHTTP);
+    }
+    return await res.json();
 }
 
 /**

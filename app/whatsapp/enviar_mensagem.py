@@ -39,7 +39,7 @@ def enviar_whatsapp(numero, mensagem, equipe=None):
     payload = {
         "number": numero_formatado,
         "text": mensagem,
-        "delay": 50,  # Delay antes do envio (ms)
+        "delay": 250,  # Delay antes do envio (ms
     }
 
     try:
@@ -65,7 +65,9 @@ def enviar_whatsapp(numero, mensagem, equipe=None):
             )
 
         logging.info(f"✅ Mensagem enviada para {numero_formatado} (Equipe: {equipe})")
-        time.sleep(random.uniform(1, 2))
+
+        time.sleep(random.uniform(0.25, 0.5))
+
 
     except SystemExit as se:
         logging.error(
