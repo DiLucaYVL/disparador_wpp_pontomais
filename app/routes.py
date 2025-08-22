@@ -4,14 +4,9 @@ import os
 import json
 import logging
 import uuid
-import traceback
-from app.services.email_sender import enviar_log_por_email
-from app.processamento.log import configurar_log 
-from app.processamento.log import finalizar_log
-from app.controller import processar_csv
 from app.processamento.mapear_gerencia import mapear_equipe
 from app.processamento.csv_reader import carregar_dados
-import logging
+from app.tasks import enqueue_csv_processing, get_task_status
 
 api_bp = Blueprint('api', __name__)
 UPLOAD_FOLDER = 'uploads'
@@ -19,13 +14,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @api_bp.route('/enviar', methods=['POST'])
 def enviar():
-    nome_arquivo_log = configurar_log()
-
     try:
         file = request.files.get('csvFile')
         ignorar_sabados = request.form.get('ignorarSabados', 'true') == 'true'
-        tipo_relatorio = request.form.get('tipoRelatorio', 'Auditoria')
-        tipo_relatorio = tipo_relatorio.strip()
+        tipo_relatorio = request.form.get('tipoRelatorio', 'Auditoria').strip()
         if tipo_relatorio not in {"Auditoria", "Ocorrências"}:
             return jsonify({
                 "success": False,
@@ -48,63 +40,51 @@ def enviar():
         equipes_selecionadas = request.form.get('equipesSelecionadas')
         equipes_selecionadas = set(json.loads(equipes_selecionadas)) if equipes_selecionadas else None
 
-        logging.info(">>> Chamando processar_csv()")
-        logs, stats, nome_arquivo_log = processar_csv(filepath, ignorar_sabados, tipo_relatorio, equipes_selecionadas)
-
-        df_debug = None
-
-        if debug_mode:
-            if tipo_relatorio == "Ocorrências":
-                from app.processamento.csv_reader_ocorrencias import carregar_dados_ocorrencias
-                df_debug = carregar_dados_ocorrencias(filepath).to_json(orient="records", force_ascii=False)
-            else:
-                from app.processamento.csv_reader import carregar_dados
-                df_debug = carregar_dados(filepath, ignorar_sabados, tipo_relatorio).to_json(orient="records", force_ascii=False)
-
-
-        if os.path.exists(filepath):
-            os.remove(filepath)
+        task_id = enqueue_csv_processing(
+            filepath, ignorar_sabados, tipo_relatorio, equipes_selecionadas, debug_mode
+        )
 
         return jsonify({
             "success": True,
-            "log": logs,
-            "stats": stats,
-            "debug": df_debug if debug_mode else None
-        })
+            "task_id": task_id,
+            "message": "Processamento agendado"
+        }), 202
 
-    except Exception as e:
-        tb = traceback.format_exc()
-        logging.error("❌ EXCEÇÃO DETALHADA:\n" + tb)
-
-        log_ja_enviado = False
-
-        if nome_arquivo_log:
-            try:
-                enviar_log_por_email(nome_arquivo_log, tb)
-                log_ja_enviado = True
-            except Exception as erro_envio:
-                logging.error(f"❌ Falha ao enviar log por e-mail: {erro_envio}")
-
-            try:
-                finalizar_log(nome_arquivo_log)
-            except Exception as e:
-                logging.warning(f"⚠️ Falha ao finalizar log: {e}")
-
-            try:
-                if os.path.exists(nome_arquivo_log):
-                    os.remove(nome_arquivo_log)
-                    print(f"🧹 Log excluído com sucesso: {nome_arquivo_log}")
-            except Exception as e:
-                print(f"⚠️ Não foi possível excluir o log: {e}")
-        else:
-            logging.warning("⚠️ Nenhum arquivo de log disponível para envio.")
-
-        # ✅ ESSA LINHA É ESSENCIAL
+    except Exception as e:  # noqa: BLE001
+        logging.exception("Erro ao agendar processamento.")
         return jsonify({
             "success": False,
-            "log": [{"type": "error", "message": "❌ Erro interno no servidor. Verifique os logs."}]
+            "log": [{"type": "error", "message": "❌ Erro ao agendar processamento."}]
         }), 500
-        
+
+
+@api_bp.route('/status/<task_id>', methods=['GET'])
+def status(task_id):
+    """Retorna o andamento e o resultado de uma tarefa agendada."""
+    task = get_task_status(task_id)
+    if not task:
+        return jsonify({"success": False, "error": "Tarefa não encontrada"}), 404
+
+    if task["status"] == "done":
+        result = task["result"]
+        return jsonify({
+            "success": True,
+            "status": "done",
+            "log": result["logs"],
+            "stats": result["stats"],
+            "debug": result.get("debug"),
+            "nome_arquivo_log": result.get("nome_arquivo_log"),
+        })
+
+    if task["status"] == "error":
+        return jsonify({
+            "success": False,
+            "status": "error",
+            "error": task["error"],
+        })
+
+    return jsonify({"success": True, "status": task["status"]})
+
 
 @api_bp.route('/equipes', methods=['POST'])
 def obter_equipes():

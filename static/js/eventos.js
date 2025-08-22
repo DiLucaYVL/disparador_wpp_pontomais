@@ -1,5 +1,5 @@
 import { gerarFormData } from './helpers.js';
-import { enviarCSV } from './api.js';
+import { enviarCSV, obterStatus } from './api.js';
 import { mostrarLogs, atualizarEstatisticas, mostrarDebug, atualizarBarraProgresso } from './ui.js';
 import { carregarDropdownEquipes } from './dropdown.js';
 
@@ -75,6 +75,9 @@ export function configurarEventos() {
             return;
         }
 
+        const botao = document.getElementById('sendButton');
+        botao.disabled = true;
+
         arquivoSelecionado = fileAtual; // Atualiza para manter válido
         const ignorarSabados = document.getElementById('ignorarSabados').checked;
         const debugMode = document.getElementById('debugMode')?.checked || false;
@@ -89,29 +92,27 @@ export function configurarEventos() {
         console.info("📦 Enviando arquivo:", arquivoSelecionado);
 
         try {
-            const data = await enviarCSV(formData);
+            const taskId = await enviarCSV(formData);
+            mostrarLogs([{ type: "info", message: "📨 Processamento agendado. Aguardando resultado..." }]);
 
-            if (!data || !data.success) {
-                console.warn("⚠️ Resposta inesperada:", data);
-                alert(data?.log?.[0] || "Erro desconhecido.");
-                return;
-            }
+            const resultado = await acompanharTarefa(taskId);
 
-            mostrarLogs(data.log);
-            atualizarEstatisticas(data.stats);
+            mostrarLogs(resultado.log);
+            atualizarEstatisticas(resultado.stats);
             atualizarBarraProgresso("100%");
 
-            if (debugMode && data.debug) {
-                mostrarDebug(data.debug);
+            if (debugMode && resultado.debug) {
+                mostrarDebug(resultado.debug);
             }
 
-            document.getElementById('sendButton').disabled = false;
             document.getElementById('fileName').textContent = `Arquivo mantido: ${arquivoSelecionado.name}`;
             document.getElementById('fileName').style.display = "block";
 
         } catch (error) {
-            console.error("❌ Erro durante envio:", error);
-            alert("Erro de rede ou servidor ao enviar mensagens.");
+            console.error("❌ Erro durante envio ou processamento:", error);
+            alert(error.message || "Erro de rede ou servidor.");
+        } finally {
+            botao.disabled = false;
         }
     });
 }
@@ -121,3 +122,16 @@ export function configurarEventos() {
 //    await carregarConfiguracoes();  // carrega o config.json
 //    configurarEventos();            // ativa os listeners de arquivo e botão
 //});
+
+async function acompanharTarefa(taskId) {
+    while (true) {
+        const data = await obterStatus(taskId);
+        if (data.status === 'done') {
+            return data;
+        }
+        if (data.status === 'error') {
+            throw new Error(data.error || 'Erro no processamento');
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+}
