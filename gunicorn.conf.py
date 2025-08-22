@@ -1,38 +1,32 @@
 import multiprocessing
 
-# Endereço/porta
+# Escuta em todas as interfaces na porta 8000
 bind = "0.0.0.0:8000"
 
-# Workers: fórmula padrão recomendada (CPU-bound)
+# Workers (processos)
 workers = multiprocessing.cpu_count() * 2 + 1
 
-# ► Se sua app for mais I/O-bound (muitas chamadas externas),
-#    você pode habilitar threads. Descomente as duas linhas abaixo:
-# worker_class = "gthread"   # usa threads por worker
-# threads = 2                # 2-4 é um bom começo
+# Classe de worker para I/O bound
+worker_class = "gthread"
 
-# ► Se sua app for ASGI (FastAPI/Starlette) e você quiser usar uvicorn:
-# from uvicorn.workers import UvicornWorker
-# worker_class = "uvicorn.workers.UvicornWorker"
+# Threads por worker (ajuste conforme a carga do servidor)
+threads = 8   # pode subir para 16 se tiver muita espera por I/O
 
-# Tempo máximo que um worker pode levar para responder (mata e recria)
-timeout = 120
+# Tempo máximo que uma request pode levar antes de matar o worker
+timeout = 600             # 10 minutos
+graceful_timeout = 60     # tempo de espera antes de forçar kill
 
-# Tempo para shutdown gracioso antes de forçar kill (default=30)
-graceful_timeout = 30
-
-# Mantém conexões HTTP ativas (keep-alive) por alguns segundos
+# Mantém conexões HTTP vivas por alguns segundos
 keepalive = 5
 
-# Estabilidade em long running: recicla workers periodicamente
-max_requests = 1000
-max_requests_jitter = 50
+# Recicla workers periodicamente para evitar vazamento de memória
+max_requests = 2000
+max_requests_jitter = 200
 
-# Logs (enviados ao journal do systemd)
-accesslog = "-"   # stdout
-errorlog = "-"    # stderr
+# Logs (mandados para stdout/stderr → visíveis via journalctl)
+accesslog = "-"
+errorlog = "-"
 loglevel = "info"
 
-# Opcional: pré-carrega a app antes de forkar os workers (pode reduzir memória)
-# Cuidado: se você abrir conexões (DB/Redis) no import, use hooks p/ reabrir por worker
-# preload_app = True
+# Opcional: usar memória compartilhada para arquivos temporários
+# worker_tmp_dir = "/dev/shm"
