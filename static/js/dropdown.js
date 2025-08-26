@@ -37,6 +37,7 @@ export function carregarDropdownEquipes(equipes) {
     });
 
     const allCheckboxes = dropdownList.querySelectorAll('input[type="checkbox"]');
+    const allDropdownItems = dropdownList.querySelectorAll('.dropdown-item');
 
     // 4. Função centralizada para atualizar tudo (contador e checkbox "Selecionar Todos")
     function atualizarStatus() {
@@ -85,6 +86,18 @@ export function carregarDropdownEquipes(equipes) {
     // Evento para cada checkbox de loja
     allCheckboxes.forEach(cb => {
         cb.addEventListener('change', atualizarStatus);
+    });
+
+    // Permitir clique na linha inteira para selecionar a loja
+    allDropdownItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (e.target.tagName === 'INPUT') {
+                return;
+            }
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            checkbox.checked = !checkbox.checked;
+            atualizarStatus();
+        });
     });
 
     // Evento para a busca
