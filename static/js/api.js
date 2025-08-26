@@ -5,6 +5,12 @@ import {
     categorizarErro
 } from './mapear-erro.js';
 
+// URL base da API, obtida via meta tag ou variável global
+const API_BASE_URL =
+    document.querySelector('meta[name="api-base-url"]')?.content ||
+    window.API_BASE_URL ||
+    '';
+
 /**
  * Envia CSV para processamento no servidor
  * @param {FormData} formData - Dados do formulário incluindo arquivo CSV
@@ -12,7 +18,7 @@ import {
  */
 export async function enviarCSV(formData) {
     try {
-        const res = await fetch('/enviar', {
+        const res = await fetch(`${API_BASE_URL}/enviar`, {
             method: 'POST',
             body: formData
         });
@@ -68,7 +74,7 @@ export async function enviarCSV(formData) {
  * @returns {Promise<Object>} Dados de status/resultados
  */
 export async function obterStatus(taskId) {
-    const res = await fetch(`/status/${taskId}`);
+    const res = await fetch(`${API_BASE_URL}/status/${taskId}`);
     const erroHTTP = await processarRespostaHTTP(res);
     if (erroHTTP) {
         throw new Error(erroHTTP);
@@ -83,7 +89,7 @@ export async function obterStatus(taskId) {
  */
 export async function obterEquipes(formData) {
     try {
-        const res = await fetch('/equipes', { 
+        const res = await fetch(`${API_BASE_URL}/equipes`, {
             method: 'POST', 
             body: formData 
         });

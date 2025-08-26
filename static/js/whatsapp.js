@@ -1,6 +1,12 @@
 // Controle de timeout para requisições
 const REQUEST_TIMEOUT = 10000; // 10 segundos
 
+// URL base da API, obtida via meta tag ou variável global
+const API_BASE_URL =
+    document.querySelector('meta[name="api-base-url"]')?.content ||
+    window.API_BASE_URL ||
+    '';
+
 function createRequestWithTimeout(url, options = {}) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
@@ -25,7 +31,7 @@ export async function verificarStatusWhatsapp() {
 
     try {
         // Consulta o status da conexão
-        const statusRes = await createRequestWithTimeout('/whatsapp/status');
+        const statusRes = await createRequestWithTimeout(`${API_BASE_URL}/whatsapp/status`);
         
         if (!statusRes.ok) {
             throw new Error(`Erro na consulta de status: ${statusRes.status}`);
@@ -62,7 +68,7 @@ export async function verificarStatusWhatsapp() {
 
             // Para Evolution API, o QR code é obtido via endpoint específico
             try {
-                const qrRes = await createRequestWithTimeout('/whatsapp/qr');
+                const qrRes = await createRequestWithTimeout(`${API_BASE_URL}/whatsapp/qr`);
                 const qrData = await qrRes.json();
                 
                 if (qrData.base64) {
@@ -88,7 +94,7 @@ export async function verificarStatusWhatsapp() {
         if (state === "OPEN") {
             try {
                 // Busca dados completos da instância
-                const instanceRes = await createRequestWithTimeout('/whatsapp/instance');
+                const instanceRes = await createRequestWithTimeout(`${API_BASE_URL}/whatsapp/instance`);
 
                 if (!instanceRes.ok) throw new Error("Erro ao buscar dados da instância");
 
@@ -163,6 +169,7 @@ export async function verificarStatusWhatsapp() {
     }
 }
 
+
 export async function fazerLogoutWhatsapp() {
     const logoutButton = document.getElementById('logoutButton');
 
@@ -170,7 +177,7 @@ export async function fazerLogoutWhatsapp() {
         logoutButton.disabled = true;
         logoutButton.innerHTML = '<span class="logout-icon">⏳</span><span class="logout-text">Desconectando...</span>';
 
-        const response = await createRequestWithTimeout('/whatsapp/logout', {
+        const response = await createRequestWithTimeout(`${API_BASE_URL}/whatsapp/logout`, {
             method: "DELETE"
         });
 

@@ -3,6 +3,12 @@ import { enviarCSV, obterStatus } from './api.js';
 import { mostrarLogs, atualizarEstatisticas, mostrarDebug, atualizarBarraProgresso } from './ui.js';
 import { carregarDropdownEquipes } from './dropdown.js';
 
+// URL base da API, obtida via meta tag ou variável global
+const API_BASE_URL =
+    document.querySelector('meta[name="api-base-url"]')?.content ||
+    window.API_BASE_URL ||
+    '';
+
 let arquivoInput = document.getElementById('csvFile');
 let arquivoSelecionado = null;  // Arquivo mantido em memória
 
@@ -23,7 +29,7 @@ export function configurarEventos() {
 
         try {
             const tipoRelatorioAtual = document.getElementById('tipoRelatorio').value;
-            const response = await fetch('/equipes', { method: 'POST', body: formData });
+            const response = await fetch(`${API_BASE_URL}/equipes`, { method: 'POST', body: formData });
 
             if (!response.ok) {
                 const texto = await response.text();  // Evita erro de JSON inválido
