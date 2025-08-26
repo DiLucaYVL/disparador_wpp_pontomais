@@ -99,7 +99,7 @@ def gerar_mensagens_assinaturas(df: pd.DataFrame) -> Dict[str, str]:
             meses_texto = ", ".join(meses_encontrados[:-1]) + f" e {meses_encontrados[-1]}"
             frase_mes = f"dos meses de {meses_texto}"
 
-        linhas = "\n".join(f"- {n}" for n in nomes)
+        linhas = "\n".join(f"- *{n}*" for n in nomes)
 
         if re.fullmatch(r"[A-Z]?\d{1,3}[A-Z]?", equipe):
             titulo = f"LOJA {equipe}"
