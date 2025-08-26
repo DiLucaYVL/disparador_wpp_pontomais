@@ -3,20 +3,8 @@ import { enviarCSV, obterStatus } from './api.js';
 import { mostrarLogs, atualizarEstatisticas, mostrarDebug, atualizarBarraProgresso } from './ui.js';
 import { carregarDropdownEquipes } from './dropdown.js';
 
-let CONFIG = {}; // variável global para guardar o config
 let arquivoInput = document.getElementById('csvFile');
 let arquivoSelecionado = null;  // Arquivo mantido em memória
-
-export async function carregarConfiguracoes() {
-    try {
-        const response = await fetch("/static/js/config.json");
-        if (!response.ok) throw new Error("Erro ao buscar config.json");
-        CONFIG = await response.json();
-        console.log("⚙️ Config carregado:", CONFIG);
-    } catch (err) {
-        console.error("❌ Falha ao carregar config.json:", err);
-    }
-}
 
 export function configurarEventos() {
     // Quando o usuário seleciona um arquivo
@@ -121,7 +109,6 @@ export function configurarEventos() {
 
 // ✅ Evento global fora das funções
 //document.addEventListener("DOMContentLoaded", async () => {
-//    await carregarConfiguracoes();  // carrega o config.json
 //    configurarEventos();            // ativa os listeners de arquivo e botão
 //});
 

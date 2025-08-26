@@ -23,6 +23,7 @@ yarn-error.log*
 # Arquivos sensíveis ou secretos
 .env
 .env.*
+!.env.example
 secrets.json
 *.pem
 *.key
@@ -46,5 +47,3 @@ desktop.ini
 .vscode/
 *.sublime-project
 *.sublime-workspace
-
-static/js/config.js

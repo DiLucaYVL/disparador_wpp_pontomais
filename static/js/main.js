@@ -2,7 +2,6 @@
 import { configurarEventos } from './eventos.js';
 import { verificarStatusWhatsapp, fazerLogoutWhatsapp } from './whatsapp.js';
 import { configurarDragAndDrop } from './dragdrop.js';
-import { carregarConfig } from './config.js';
 let intervalId = null;
 let isConnected = false;
 let isChecking = false; // Adicionar debouncing
@@ -37,8 +36,6 @@ async function verificarStatusComIntervalo() {
     }
 }
 window.addEventListener('DOMContentLoaded', async () => {
-    await carregarConfig();
-    
     configurarEventos();
     configurarDragAndDrop();
     
