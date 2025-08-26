@@ -104,12 +104,12 @@ def gerar_mensagens_assinaturas(df: pd.DataFrame) -> Dict[str, str]:
         if re.fullmatch(r"[A-Z]?\d{1,3}[A-Z]?", equipe):
             titulo = f"LOJA {equipe}"
         else:
-            titulo = f"ASSINATURA DE ESPELHO PONTO | {equipe}"
+            titulo = f"{equipe}"
 
         mensagem = (
-            f"{titulo}\n"
+            f"*{titulo}*\n\n"
             f"Por favor assinar o espelho ponto {frase_mes}\n"
-            f"{linhas}"
+            f"*{linhas}*"
         ).strip()
         mensagens[equipe] = mensagem
 
