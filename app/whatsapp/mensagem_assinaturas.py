@@ -1,4 +1,5 @@
 from collections import Counter
+import re
 
 
 def gerar_mensagens_assinaturas(df):
@@ -25,8 +26,14 @@ def gerar_mensagens_assinaturas(df):
             mes = ""
 
         linhas = "\n".join(f"- {n}" for n in nomes)
+
+        if re.fullmatch(r"[A-Z]?\d{1,3}[A-Z]?", equipe):
+            titulo = f"LOJA {equipe}"
+        else:
+            titulo = f"ASSINATURA DE ESPELHO PONTO | {equipe}"
+
         mensagem = (
-            f"ASSINATURA DE ESPELHO PONTO LOJA {equipe}\n"
+            f"{titulo}\n"
             f"Os colaboradores abaixo não assinaram o espelho ponto do mês {mes}\n"
             f"{linhas}"
         ).strip()
