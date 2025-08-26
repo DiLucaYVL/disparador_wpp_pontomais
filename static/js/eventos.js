@@ -46,6 +46,8 @@ export function configurarEventos() {
                     msgErro = "❌ O tipo de relatório selecionado foi 'Ocorrências', mas o arquivo não contém as colunas esperadas ('Motivo', 'Ação pendente', etc).";
                 } else if (tipoRelatorioAtual === "Auditoria") {
                     msgErro = "❌ O tipo de relatório selecionado foi 'Auditoria', mas o arquivo está em formato incorreto.";
+                } else if (tipoRelatorioAtual === "Assinaturas") {
+                    msgErro = "❌ O tipo de relatório selecionado foi 'Assinaturas', mas o arquivo está em formato incorreto.";
                 }
 
                 throw new Error(msgErro);

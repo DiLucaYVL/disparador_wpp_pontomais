@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoSelectedText = document.getElementById('tipoSelectedText');
     const tipoRelatorioInput = document.getElementById('tipoRelatorio');
     const tipoDropdownItems = document.querySelectorAll('.tipo-dropdown-item');
+    const ignorarSabadosCheckbox = document.getElementById('ignorarSabados');
+    const ignorarSabadosLabel = document.querySelector('label[for="ignorarSabados"]');
 
     // Toggle dropdown
     tipoDropdownHeader.addEventListener('click', function() {
@@ -57,6 +59,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Habilitar upload
             atualizarStatusUpload();
+
+            // Desabilitar checkbox de sábados para Assinaturas
+            if (value === 'Assinaturas') {
+                ignorarSabadosCheckbox.disabled = true;
+                ignorarSabadosLabel.classList.add('upload-disabled');
+            } else {
+                ignorarSabadosCheckbox.disabled = false;
+                ignorarSabadosLabel.classList.remove('upload-disabled');
+            }
         });
     });
 
