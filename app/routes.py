@@ -4,13 +4,31 @@ import os
 import json
 import logging
 import uuid
+import requests
 from app.processamento.mapear_gerencia import mapear_equipe
 from app.processamento.csv_reader import carregar_dados
 from app.tasks import enqueue_csv_processing, get_task_status
+from app.config.settings import (
+    EVOLUTION_INSTANCE,
+    EVOLUTION_TOKEN,
+    EVOLUTION_URL,
+)
 
 api_bp = Blueprint('api', __name__)
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+def _evo_headers():
+    return {"Content-Type": "application/json", "apikey": EVOLUTION_TOKEN}
+
+
+@api_bp.route('/config', methods=['GET'])
+def get_config():
+    return jsonify({
+        "EVOLUTION_URL": EVOLUTION_URL,
+        "EVOLUTION_INSTANCE": EVOLUTION_INSTANCE,
+    })
 
 @api_bp.route('/enviar', methods=['POST'])
 def enviar():
@@ -127,3 +145,47 @@ def obter_equipes():
 def well_known(subpath):
     # Não serve nada; só evita poluir o log com 404
     return ("", 204)
+
+
+@api_bp.route('/whatsapp/status', methods=['GET'])
+def whatsapp_status():
+    try:
+        url = f"{EVOLUTION_URL}/instance/connectionState/{EVOLUTION_INSTANCE}"
+        resp = requests.get(url, headers=_evo_headers(), timeout=30)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("Erro ao obter status do WhatsApp")
+        return jsonify({"error": str(exc)}), 500
+
+
+@api_bp.route('/whatsapp/qr', methods=['GET'])
+def whatsapp_qr():
+    try:
+        url = f"{EVOLUTION_URL}/instance/connect/{EVOLUTION_INSTANCE}"
+        resp = requests.get(url, headers=_evo_headers(), timeout=30)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("Erro ao obter QR Code do WhatsApp")
+        return jsonify({"error": str(exc)}), 500
+
+
+@api_bp.route('/whatsapp/instance', methods=['GET'])
+def whatsapp_instance():
+    try:
+        url = f"{EVOLUTION_URL}/instance/fetchInstances?instanceName={EVOLUTION_INSTANCE}"
+        resp = requests.get(url, headers=_evo_headers(), timeout=30)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("Erro ao obter dados da instância")
+        return jsonify({"error": str(exc)}), 500
+
+
+@api_bp.route('/whatsapp/logout', methods=['DELETE'])
+def whatsapp_logout():
+    try:
+        url = f"{EVOLUTION_URL}/instance/logout/{EVOLUTION_INSTANCE}"
+        resp = requests.delete(url, headers=_evo_headers(), timeout=30)
+        return jsonify(resp.json()), resp.status_code
+    except Exception as exc:  # noqa: BLE001
+        logging.exception("Erro ao desconectar WhatsApp")
+        return jsonify({"error": str(exc)}), 500

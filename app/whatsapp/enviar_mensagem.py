@@ -1,19 +1,15 @@
-import json
 import logging
-import os
 import random
 import signal
 import sys
 import time
 
 import requests
-config_path = os.path.join(os.path.dirname(__file__), "..", "..", "static", "config.json")
-with open(config_path, "r", encoding="utf-8") as f:
-    config = json.load(f)
-
-EVOLUTION_URL = config["EVOLUTION_URL"]
-EVOLUTION_INSTANCE = config["EVOLUTION_INSTANCE"]
-EVOLUTION_TOKEN = config.get("EVOLUTION_TOKEN", "")
+from app.config.settings import (
+    EVOLUTION_INSTANCE,
+    EVOLUTION_TOKEN,
+    EVOLUTION_URL,
+)
 
 def _get_headers():
     """Retorna os headers padrão para as requisições"""

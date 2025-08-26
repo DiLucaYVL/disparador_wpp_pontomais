@@ -1,5 +1,3 @@
-// IMPORTAÇÃO ATUALIZADA
-import { carregarConfig } from './config.js';
 // Controle de timeout para requisições
 const REQUEST_TIMEOUT = 10000; // 10 segundos
 
@@ -15,13 +13,6 @@ function createRequestWithTimeout(url, options = {}) {
     });
 }
 
-function _getHeaders(token) {
-    return {
-        'Content-Type': 'application/json',
-        'apiKey': token
-    };
-}
-
 export async function verificarStatusWhatsapp() {
     const nomeElem = document.getElementById('whatsappNome');
     const numeroElem = document.getElementById('whatsappNumero');
@@ -32,14 +23,9 @@ export async function verificarStatusWhatsapp() {
     const connectionMessage = document.getElementById('connectionMessage');
     const logoutSection = document.getElementById('logoutSection');
 
-    // 🟢 CARREGANDO CONFIG
-    const { api_url, instance, token } = await carregarConfig();
-
     try {
         // Consulta o status da conexão
-        const statusRes = await createRequestWithTimeout(`${api_url}/instance/connectionState/${instance}`, {
-            headers: _getHeaders(token)
-        });
+        const statusRes = await createRequestWithTimeout('/whatsapp/status');
         
         if (!statusRes.ok) {
             throw new Error(`Erro na consulta de status: ${statusRes.status}`);
@@ -76,9 +62,7 @@ export async function verificarStatusWhatsapp() {
 
             // Para Evolution API, o QR code é obtido via endpoint específico
             try {
-                const qrRes = await createRequestWithTimeout(`${api_url}/instance/connect/${instance}`, {
-                    headers: _getHeaders(token)
-                });
+                const qrRes = await createRequestWithTimeout('/whatsapp/qr');
                 const qrData = await qrRes.json();
                 
                 if (qrData.base64) {
@@ -104,9 +88,7 @@ export async function verificarStatusWhatsapp() {
         if (state === "OPEN") {
             try {
                 // Busca dados completos da instância
-                const instanceRes = await createRequestWithTimeout(`${api_url}/instance/fetchInstances?instanceName=${instance}`, {
-                    headers: _getHeaders(token)
-                });
+                const instanceRes = await createRequestWithTimeout('/whatsapp/instance');
 
                 if (!instanceRes.ok) throw new Error("Erro ao buscar dados da instância");
 
@@ -115,7 +97,7 @@ export async function verificarStatusWhatsapp() {
 
                 // Extrai dados
                 const profileName = inst?.profileName || "Ponto | DP";
-                const ownerNumber = (inst?.ownerJid || '').split('@')[0] || instance;
+                const ownerNumber = (inst?.ownerJid || '').split('@')[0] || '';
                 const profilePictureUrl = inst?.profilePicUrl || null;
 
                 // Preenche na interface
@@ -135,7 +117,7 @@ export async function verificarStatusWhatsapp() {
             } catch (profileError) {
                 console.warn("Erro ao obter dados da instância:", profileError);
                 nomeElem.textContent = `🟢 Conectado`;
-                numeroElem.textContent = `📞 ${instance}`;
+                numeroElem.textContent = '';
                 fotoElem.src = "";
                 fotoElem.style.display = "none";
                 fotoElem.parentElement.querySelector('.avatar-placeholder').style.display = "flex";
@@ -185,14 +167,11 @@ export async function fazerLogoutWhatsapp() {
     const logoutButton = document.getElementById('logoutButton');
 
     try {
-        const { api_url, instance, token } = await carregarConfig();
-
         logoutButton.disabled = true;
         logoutButton.innerHTML = '<span class="logout-icon">⏳</span><span class="logout-text">Desconectando...</span>';
 
-        const response = await createRequestWithTimeout(`${api_url}/instance/logout/${instance}`, {
-            method: "DELETE",
-            headers: _getHeaders(token)
+        const response = await createRequestWithTimeout('/whatsapp/logout', {
+            method: "DELETE"
         });
 
         if (response.ok) {

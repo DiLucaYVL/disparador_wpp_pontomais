@@ -141,14 +141,11 @@ cp .env.example .env
 # Edite o arquivo .env com suas configurações
 ```
 
-5. **Configure a Evolution API:**
-```bash
-# Edite static/config.json
-{
-  "EVOLUTION_URL": "http://localhost:8080",
-  "EVOLUTION_INSTANCE": "seu-instance",
-  "EVOLUTION_TOKEN": "seu-token"
-}
+Exemplo de `.env`:
+```env
+EVOLUTION_URL=http://localhost:8080
+EVOLUTION_INSTANCE=seu-instance
+EVOLUTION_TOKEN=seu-token
 ```
 
 ### Instalação com Docker
