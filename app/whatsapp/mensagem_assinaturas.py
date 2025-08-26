@@ -108,7 +108,7 @@ def gerar_mensagens_assinaturas(df: pd.DataFrame) -> Dict[str, str]:
 
         mensagem = (
             f"{titulo}\n"
-            f"Os colaboradores abaixo não assinaram o espelho ponto {frase_mes}\n"
+            f"Por favor assinar o espelho ponto {frase_mes}\n"
             f"{linhas}"
         ).strip()
         mensagens[equipe] = mensagem
