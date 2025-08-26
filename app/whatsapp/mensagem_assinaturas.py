@@ -7,10 +7,18 @@ def gerar_mensagens_assinaturas(df):
 
     Retorna um dicionário {equipe_tratada: mensagem_final} para cada equipe que
     possui pelo menos um colaborador com pendência de assinatura.
+
+    Caso a coluna ``Assinado?`` esteja presente, apenas colaboradores com valor
+    "Não" permanecerão na lista e, consequentemente, na prévia de envio.
     """
     mensagens = {}
     if df.empty:
         return mensagens
+
+    if "Assinado?" in df.columns:
+        df = df[df["Assinado?"].astype(str).str.strip().str.lower() == "não"]
+        if df.empty:
+            return mensagens
 
     for equipe, grupo in df.groupby("EquipeTratada"):
         nomes = grupo["Nome"].dropna().tolist()
