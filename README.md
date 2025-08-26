@@ -193,6 +193,18 @@ server {
 ```
 </details>
 
+#### URL base da API
+
+Defina a URL usada pelos scripts do frontend via meta tag ou variável global:
+
+```html
+<meta name="api-base-url" content="https://api.exemplo.com">
+<!-- ou -->
+<script>window.API_BASE_URL = 'https://api.exemplo.com';</script>
+```
+
+Se nada for informado, o mesmo domínio da página será utilizado.
+
 ## Uso
 
 ### 1. Conectar WhatsApp
