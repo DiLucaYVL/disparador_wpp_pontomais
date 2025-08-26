@@ -1,6 +1,7 @@
 import pandas as pd
 from app.processamento.mapear_gerencia import mapear_equipe
 from app.processamento.csv_reader_ocorrencias import carregar_dados_ocorrencias
+from app.processamento.csv_reader_assinaturas import carregar_dados_assinaturas
 from app.whatsapp.mensagem import validar_ocorrencia
 
 def carregar_dados(caminho_csv, ignorar_sabados, tipo_relatorio):
@@ -49,7 +50,9 @@ def carregar_dados(caminho_csv, ignorar_sabados, tipo_relatorio):
         return df
     elif tipo_relatorio == "Ocorrências":
         return carregar_dados_ocorrencias(caminho_csv)
+    elif tipo_relatorio == "Assinaturas":
+        return carregar_dados_assinaturas(caminho_csv)
     else:
-        raise ValueError("Tipo de relatório inválido. Escolha 'Auditoria' ou 'Ocorrências'.")
+        raise ValueError("Tipo de relatório inválido. Escolha 'Auditoria', 'Ocorrências' ou 'Assinaturas'.")
 
 

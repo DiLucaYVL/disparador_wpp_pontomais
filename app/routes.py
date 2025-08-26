@@ -18,10 +18,10 @@ def enviar():
         file = request.files.get('csvFile')
         ignorar_sabados = request.form.get('ignorarSabados', 'true') == 'true'
         tipo_relatorio = request.form.get('tipoRelatorio', 'Auditoria').strip()
-        if tipo_relatorio not in {"Auditoria", "Ocorrências"}:
+        if tipo_relatorio not in {"Auditoria", "Ocorrências", "Assinaturas"}:
             return jsonify({
                 "success": False,
-                "log": [{"type": "error", "message": f"❌ Tipo de relatório inválido: {tipo_relatorio}. Selecione 'Auditoria' ou 'Ocorrências'."}]
+                "log": [{"type": "error", "message": f"❌ Tipo de relatório inválido: {tipo_relatorio}. Selecione 'Auditoria', 'Ocorrências' ou 'Assinaturas'."}]
             }), 400
 
         debug_mode = request.form.get('debugMode', 'false') == 'true'
@@ -91,6 +91,11 @@ def obter_equipes():
     file = request.files.get('csvFile')
     ignorar_sabados = request.form.get('ignorarSabados', 'true') == 'true'
     tipo_relatorio = request.form.get('tipoRelatorio', 'Auditoria')
+    if tipo_relatorio not in {"Auditoria", "Ocorrências", "Assinaturas"}:
+        return jsonify({
+            "success": False,
+            "error": f"Tipo de relatório inválido: {tipo_relatorio}"
+        }), 400
 
     if not file or not file.filename.lower().endswith('csv'):
         return jsonify({"success": False, "error": "Arquivo CSV inválido"}), 400
