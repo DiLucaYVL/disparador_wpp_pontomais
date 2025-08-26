@@ -94,7 +94,7 @@ def gerar_mensagens_assinaturas(df: pd.DataFrame) -> Dict[str, str]:
         if not meses_encontrados:
             frase_mes = "do mês"
         elif len(meses_encontrados) == 1:
-            frase_mes = f"do mês {meses_encontrados[0]}"
+            frase_mes = f"do mês de {meses_encontrados[0]}"
         else:
             meses_texto = ", ".join(meses_encontrados[:-1]) + f" e {meses_encontrados[-1]}"
             frase_mes = f"dos meses de {meses_texto}"
@@ -109,7 +109,7 @@ def gerar_mensagens_assinaturas(df: pd.DataFrame) -> Dict[str, str]:
         mensagem = (
             f"*{titulo}*\n\n"
             f"Por favor assinar o espelho ponto {frase_mes}\n"
-            f"*{linhas}*"
+            f"{linhas}"
         ).strip()
         mensagens[equipe] = mensagem
 
