@@ -5,8 +5,8 @@ from typing import Optional
 
 from app.controller import processar_csv
 
-# Executor global para evitar concorrência entre relatórios
-_executor = ThreadPoolExecutor(max_workers=1)
+# Executor global por processo
+_executor = ThreadPoolExecutor(max_workers=4)
 _tasks = {}
 
 
