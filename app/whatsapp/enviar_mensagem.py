@@ -49,6 +49,15 @@ def enviar_whatsapp(numero, mensagem, equipe=None):
         logging.info(f"Evolution API status: {response.status_code}")
         logging.info(f"Evolution API response: {response.text}")
 
+        if 400 <= response.status_code < 500:
+            req = response.request
+            logging.error(
+                "Falha 4xx ao chamar Evolution API - endpoint=%s método=%s body=%s",
+                req.url,
+                req.method,
+                req.body,
+            )
+
         if response.status_code not in [200, 201]:
             raise Exception(
                 f"Erro Evolution API: {response.status_code} - {response.text}"
