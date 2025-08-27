@@ -71,9 +71,9 @@ def enviar_whatsapp(numero, mensagem, equipe=None):
         )
         logging.error(f"🚨 Exit code: {se.code}")
         raise
-    except BaseException as be:
-        logging.error(f"🚨 BASEEXCEPTION CAPTURADA: {type(be).__name__}")
-        raise
     except Exception as e:
         logging.error(f"❌ Falha ao enviar para {numero_formatado} - {e}")
+        raise
+    except BaseException as be:
+        logging.error(f"🚨 BASEEXCEPTION CAPTURADA: {type(be).__name__}")
         raise
