@@ -41,9 +41,14 @@ def processar_ocorrencias(df):
             )
 
     # Agrupar por Nome e Data para consolidar as mensagens por ocorrência
-    mensagens_ocorrencias = df.groupby(["Nome", "Data"]).apply(
-        lambda g: "\n".join(
-            [msg for _, row in g.iterrows() if (msg := gerar_linha_ocorrencia(row)) is not None]
+    mensagens_ocorrencias = (
+        df.groupby(["Nome", "Data"], group_keys=False)
+        .apply(
+            lambda g: "\n".join(
+                msg
+                for _, row in g.iterrows()
+                if (msg := gerar_linha_ocorrencia(row)) is not None
+            )
         )
     )
     mensagens_ocorrencias = mensagens_ocorrencias.replace("", pd.NA).dropna()
