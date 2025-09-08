@@ -195,15 +195,13 @@ server {
 
 #### URL base da API
 
-Defina a URL usada pelos scripts do frontend via meta tag ou variável global:
+A URL base da API é definida uma única vez na interface web e reutilizada pelos scripts:
 
 ```html
-<meta name="api-base-url" content="https://api.exemplo.com">
-<!-- ou -->
-<script>window.API_BASE_URL = 'https://api.exemplo.com';</script>
+<script>window.API_BASE_URL = window.location.origin;</script>
 ```
 
-Se nada for informado, o mesmo domínio da página será utilizado.
+Altere esse valor caso a API esteja em outro domínio.
 
 ## Uso
 
