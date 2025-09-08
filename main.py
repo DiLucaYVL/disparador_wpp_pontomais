@@ -15,4 +15,11 @@ def index():
 
 if __name__ == '__main__':
     os.environ['FLASK_RUN_FROM_CLI'] = 'false'  # força execução única
-    app.run(debug=False, use_reloader=False)
+    
+    # Verifica se deve usar debug mode
+    debug_mode = os.getenv('FLASK_DEBUG', '0') == '1' or os.getenv('FLASK_ENV') == 'development'
+    
+    print(f"🐛 Debug mode: {debug_mode}")
+    print(f"🌐 Servidor iniciando em http://127.0.0.1:5000")
+    
+    app.run(debug=debug_mode, use_reloader=False, host='127.0.0.1', port=5000)
