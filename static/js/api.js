@@ -6,10 +6,7 @@ import {
 } from './mapear-erro.js';
 
 // URL base da API, obtida via meta tag ou variável global
-const API_BASE_URL =
-    document.querySelector('meta[name="api-base-url"]')?.content ||
-    window.API_BASE_URL ||
-    '';
+const API_BASE_URL = "http://192.168.99.50:8000";
 
 /**
  * Envia CSV para processamento no servidor
