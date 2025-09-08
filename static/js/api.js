@@ -5,8 +5,8 @@ import {
     categorizarErro
 } from './mapear-erro.js';
 
-// URL base da API, obtida via meta tag ou variável global
-const API_BASE_URL = "http://192.168.99.50:8000";
+// URL base da API, definida globalmente
+const API_BASE_URL = window.API_BASE_URL;
 
 /**
  * Envia CSV para processamento no servidor

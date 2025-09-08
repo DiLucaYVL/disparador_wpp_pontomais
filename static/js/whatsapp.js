@@ -1,7 +1,7 @@
 // Controle de timeout para requisições
 const REQUEST_TIMEOUT = 10000; // 10 segundos
 
-const API_BASE_URL = "http://192.168.99.50:8000";
+const API_BASE_URL = window.API_BASE_URL;
 
 function createRequestWithTimeout(url, options = {}) {
     const controller = new AbortController();

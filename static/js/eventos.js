@@ -3,11 +3,8 @@ import { enviarCSV, obterStatus } from './api.js';
 import { mostrarLogs, atualizarEstatisticas, mostrarDebug, atualizarBarraProgresso } from './ui.js';
 import { carregarDropdownEquipes } from './dropdown.js';
 
-// URL base da API, obtida via meta tag ou variável global
-const API_BASE_URL =
-    document.querySelector('meta[name="api-base-url"]')?.content ||
-    window.API_BASE_URL ||
-    '';
+// URL base da API definida globalmente
+const API_BASE_URL = window.API_BASE_URL;
 
 let arquivoInput = document.getElementById('csvFile');
 let arquivoSelecionado = null;  // Arquivo mantido em memória
