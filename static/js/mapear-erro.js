@@ -126,10 +126,18 @@ export async function processarRespostaHTTP(response) {
             // Prioriza mensagens do log do servidor (Flask)
             if (errorData.log && Array.isArray(errorData.log) && errorData.log.length > 0) {
                 const mensagensServidor = errorData.log
-                    .filter(entry => entry.type === 'error')
-                    .map(entry => entry.message.replace(/^❌\s*/, '')) // Remove emoji duplicado
+                    .map(entry => {
+                        if (typeof entry === 'string') {
+                            return entry.replace(/^❌\s*/, '');
+                        }
+                        if (entry.type === 'error') {
+                            return entry.message.replace(/^❌\s*/, '');
+                        }
+                        return null;
+                    })
+                    .filter(Boolean)
                     .join(', ');
-                
+
                 if (mensagensServidor) {
                     return `${mensagensServidor}`;
                 }
