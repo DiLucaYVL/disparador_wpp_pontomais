@@ -1,7 +1,7 @@
 from app.processamento.csv_reader import carregar_dados
 from app.whatsapp.mensagem import gerar_mensagens
 from app.whatsapp.mensagem_assinaturas import gerar_mensagens_assinaturas
-from app.whatsapp.enviar_mensagem import enviar_whatsapp
+from app.routes import enviar_whatsapp
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.whatsapp.numeros_equipes import carregar_numeros_equipes
 from app.processamento.log import configurar_log
