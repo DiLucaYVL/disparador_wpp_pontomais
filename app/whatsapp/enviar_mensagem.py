@@ -28,7 +28,41 @@ signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGABRT, signal_handler)
 
 
+def verificar_sessao() -> bool:
+    """Verifica se a sessão do WhatsApp está aberta.
+
+    Realiza uma chamada ao endpoint ``/whatsapp/status`` e valida se o
+    campo ``connectionState`` da resposta está definido como ``"open"``.
+
+    Returns:
+        bool: ``True`` se a sessão estiver aberta, ``False`` caso contrário.
+    """
+
+    url = f"{EVOLUTION_URL}/whatsapp/status"
+
+    try:
+        response = requests.get(url, headers=_get_headers(), timeout=30)
+        response.raise_for_status()
+
+        data = response.json()
+        estado = data.get("connectionState") or data.get("instance", {}).get("state")
+
+        if isinstance(estado, str) and estado.lower() == "open":
+            return True
+
+        logging.error("Sessão do WhatsApp desconectada: %s", estado)
+        return False
+
+    except Exception as exc:  # noqa: BLE001
+        logging.error("Erro ao verificar status do WhatsApp: %s", exc)
+        return False
+
+
 def enviar_whatsapp(numero, mensagem, equipe=None):
+    if not verificar_sessao():
+        logging.error("Sessão do WhatsApp desconectada")
+        raise RuntimeError("Sessão do WhatsApp desconectada")
+
     numero_formatado = numero.replace("+", "").replace("-", "").replace(" ", "")
     url = f"{EVOLUTION_URL}/message/sendText/{EVOLUTION_INSTANCE}"
 
