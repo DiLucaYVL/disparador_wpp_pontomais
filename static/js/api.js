@@ -5,8 +5,8 @@ import {
     categorizarErro
 } from './mapear-erro.js';
 
-// URL base da API, definida globalmente
-const API_BASE_URL = window.API_BASE_URL;
+// URL base da API interna (origem atual)
+const API_BASE_URL = window.location.origin;
 
 /**
  * Envia CSV para processamento no servidor

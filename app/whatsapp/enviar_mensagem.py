@@ -5,6 +5,7 @@ import sys
 import time
 
 import requests
+from urllib.parse import urljoin
 from app.config.settings import (
     EVOLUTION_INSTANCE,
     EVOLUTION_TOKEN,
@@ -31,21 +32,22 @@ signal.signal(signal.SIGABRT, signal_handler)
 def verificar_sessao() -> bool:
     """Verifica se a sessão do WhatsApp está aberta.
 
-    Realiza uma chamada ao endpoint ``/whatsapp/status`` e valida se o
-    campo ``connectionState`` da resposta está definido como ``"open"``.
+    Realiza uma chamada ao endpoint ``/instance/connectionState`` da Evolution
+    API e valida se o campo ``state`` ou ``connectionState`` da resposta está
+    definido como ``"open"``.
 
     Returns:
         bool: ``True`` se a sessão estiver aberta, ``False`` caso contrário.
     """
 
-    url = f"{EVOLUTION_URL}/whatsapp/status"
+    url = urljoin(EVOLUTION_URL, f"/instance/connectionState/{EVOLUTION_INSTANCE}")
 
     try:
         response = requests.get(url, headers=_get_headers(), timeout=30)
         response.raise_for_status()
 
         data = response.json()
-        estado = data.get("connectionState") or data.get("instance", {}).get("state")
+        estado = data.get("state") or data.get("connectionState") or data.get("instance", {}).get("state")
 
         if isinstance(estado, str) and estado.lower() == "open":
             return True
@@ -64,12 +66,12 @@ def enviar_whatsapp(numero, mensagem, equipe=None):
         raise RuntimeError("Sessão do WhatsApp desconectada")
 
     numero_formatado = numero.replace("+", "").replace("-", "").replace(" ", "")
-    url = f"{EVOLUTION_URL}/message/sendText/{EVOLUTION_INSTANCE}"
+    url = urljoin(EVOLUTION_URL, f"/message/sendText/{EVOLUTION_INSTANCE}")
 
     payload = {
         "number": numero_formatado,
         "text": mensagem,
-        "delay": 250,  # Delay antes do envio (ms
+        "delay": 250,  # Delay antes do envio (ms)
     }
 
     try:

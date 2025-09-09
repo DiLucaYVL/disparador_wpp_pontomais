@@ -193,15 +193,14 @@ server {
 ```
 </details>
 
-#### URL base da API
+#### URLs da aplicação
 
-A URL base da API é definida uma única vez na interface web e reutilizada pelos scripts:
-
-```html
-<script>window.API_BASE_URL = window.location.origin;</script>
-```
-
-Altere esse valor caso a API esteja em outro domínio.
+- **API interna**: o frontend usa automaticamente `window.location.origin` para
+  conversar com o backend Flask. Dessa forma, a mesma URL acessada no
+  navegador é reutilizada nas requisições.
+- **EVOLUTION_URL**: variável de ambiente que aponta para a Evolution API
+  externa, responsável pelo envio das mensagens de WhatsApp. Defina esse valor
+  no arquivo `.env`.
 
 ## Uso
 

@@ -5,6 +5,7 @@ import json
 import logging
 import uuid
 import requests
+from urllib.parse import urljoin
 from app.processamento.mapear_gerencia import mapear_equipe
 from app.processamento.csv_reader import carregar_dados
 from app.tasks import enqueue_csv_processing, get_task_status
@@ -150,7 +151,7 @@ def well_known(subpath):
 @api_bp.route('/whatsapp/status', methods=['GET'])
 def whatsapp_status():
     try:
-        url = f"{EVOLUTION_URL}/instance/connectionState/{EVOLUTION_INSTANCE}"
+        url = urljoin(EVOLUTION_URL, f"/instance/connectionState/{EVOLUTION_INSTANCE}")
         resp = requests.get(url, headers=_evo_headers(), timeout=30)
         return jsonify(resp.json()), resp.status_code
     except Exception as exc:  # noqa: BLE001
@@ -161,7 +162,7 @@ def whatsapp_status():
 @api_bp.route('/whatsapp/qr', methods=['GET'])
 def whatsapp_qr():
     try:
-        url = f"{EVOLUTION_URL}/instance/connect/{EVOLUTION_INSTANCE}"
+        url = urljoin(EVOLUTION_URL, f"/instance/connect/{EVOLUTION_INSTANCE}")
         resp = requests.get(url, headers=_evo_headers(), timeout=30)
         return jsonify(resp.json()), resp.status_code
     except Exception as exc:  # noqa: BLE001
@@ -172,7 +173,10 @@ def whatsapp_qr():
 @api_bp.route('/whatsapp/instance', methods=['GET'])
 def whatsapp_instance():
     try:
-        url = f"{EVOLUTION_URL}/instance/fetchInstances?instanceName={EVOLUTION_INSTANCE}"
+        url = urljoin(
+            EVOLUTION_URL,
+            f"/instance/fetchInstances?instanceName={EVOLUTION_INSTANCE}",
+        )
         resp = requests.get(url, headers=_evo_headers(), timeout=30)
         return jsonify(resp.json()), resp.status_code
     except Exception as exc:  # noqa: BLE001
@@ -183,7 +187,7 @@ def whatsapp_instance():
 @api_bp.route('/whatsapp/logout', methods=['DELETE'])
 def whatsapp_logout():
     try:
-        url = f"{EVOLUTION_URL}/instance/logout/{EVOLUTION_INSTANCE}"
+        url = urljoin(EVOLUTION_URL, f"/instance/logout/{EVOLUTION_INSTANCE}")
         resp = requests.delete(url, headers=_evo_headers(), timeout=30)
         return jsonify(resp.json()), resp.status_code
     except Exception as exc:  # noqa: BLE001
