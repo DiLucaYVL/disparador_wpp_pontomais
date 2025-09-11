@@ -35,22 +35,29 @@ function atualizarGrafico(dados) {
   }, {});
   const labels = Object.keys(contagem);
   const valores = Object.values(contagem);
-  if (grafico) grafico.destroy();
-  grafico = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Envios',
-        data: valores,
-        backgroundColor: '#4CAF50'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false
-    }
-  });
+
+  if (grafico) {
+    grafico.data.labels = labels;
+    grafico.data.datasets[0].data = valores;
+    grafico.update();
+  } else {
+    grafico = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Envios',
+          data: valores,
+          backgroundColor: '#4CAF50'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+  }
+
 }
 
 function atualizarEquipeSelect(dados) {
@@ -68,4 +75,5 @@ function atualizarEquipeSelect(dados) {
 }
 
 document.getElementById('aplicarFiltros').addEventListener('click', carregarDados);
-window.addEventListener('load', carregarDados);
+carregarDados();
+
