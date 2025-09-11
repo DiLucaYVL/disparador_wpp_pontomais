@@ -174,3 +174,51 @@
     font-size: 14px;
 }
 
+/* ===== SEÇÃO DE HISTÓRICO ===== */
+.history-section {
+    margin-top: 16px;
+    transition: all 0.3s ease;
+}
+
+.history-section.hidden {
+    display: none;
+}
+
+.history-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #4B5563, #374151);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(55, 65, 81, 0.2);
+}
+
+.history-button:hover {
+    background: linear-gradient(135deg, #374151, #1F2937);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(55, 65, 81, 0.3);
+}
+
+.history-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(55, 65, 81, 0.2);
+}
+
+.history-icon {
+    font-size: 16px;
+}
+
+.history-text {
+    font-size: 14px;
+}
+
