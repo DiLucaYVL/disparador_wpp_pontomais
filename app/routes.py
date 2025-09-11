@@ -15,6 +15,7 @@ from app.config.settings import (
     EVOLUTION_TOKEN,
     EVOLUTION_URL,
 )
+from app.history import listar_envios
 
 api_bp = Blueprint('api', __name__)
 UPLOAD_FOLDER = 'uploads'
@@ -298,3 +299,14 @@ def whatsapp_logout():
     except Exception as exc:  # noqa: BLE001
         logging.exception("Erro ao desconectar WhatsApp")
         return jsonify({"error": str(exc)}), 500
+
+
+@api_bp.route('/historico/dados', methods=['GET'])
+def historico_envios():
+    """Retorna o histórico de envios com filtros opcionais."""
+    equipe = request.args.get('equipe')
+    tipo = request.args.get('tipo')
+    inicio = request.args.get('inicio')
+    fim = request.args.get('fim')
+    dados = listar_envios(equipe=equipe, tipo=tipo, inicio=inicio, fim=fim)
+    return jsonify({"success": True, "dados": dados})
