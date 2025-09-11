@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histórico de Envios</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main-content.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Histórico de Envios</h1>
+        </div>
+        <div class="content">
+            <div class="card">
+                <h3>Filtros</h3>
+                <div class="filters">
+                    <label>Equipe:
+                        <select id="filtroEquipe">
+                            <option value="">Todas</option>
+                        </select>
+                    </label>
+                    <label>Tipo:
+                        <select id="filtroTipo">
+                            <option value="">Todos</option>
+                            <option value="Auditoria">Auditoria</option>
+                            <option value="Assinaturas">Assinaturas</option>
+                            <option value="Ocorrências">Ocorrências</option>
+                        </select>
+                    </label>
+                    <label>De:
+                        <input type="date" id="filtroInicio">
+                    </label>
+                    <label>Até:
+                        <input type="date" id="filtroFim">
+                    </label>
+                    <button id="aplicarFiltros">Filtrar</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Resumo por Status</h3>
+                <canvas id="graficoStatus"></canvas>
+            </div>
+
+            <div class="card">
+                <h3>Registros</h3>
+                <table id="tabelaEnvios">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Equipe</th>
+                            <th>Tipo</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="module" src="{{ url_for('static', filename='js/historico.js') }}"></script>
+</body>
+</html>
