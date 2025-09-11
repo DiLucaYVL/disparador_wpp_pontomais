@@ -35,6 +35,7 @@ function atualizarGrafico(dados) {
   }, {});
   const labels = Object.keys(contagem);
   const valores = Object.values(contagem);
+
   if (grafico) {
     grafico.data.labels = labels;
     grafico.data.datasets[0].data = valores;
@@ -56,6 +57,7 @@ function atualizarGrafico(dados) {
       }
     });
   }
+
 }
 
 function atualizarEquipeSelect(dados) {
@@ -74,3 +76,4 @@ function atualizarEquipeSelect(dados) {
 
 document.getElementById('aplicarFiltros').addEventListener('click', carregarDados);
 carregarDados();
+
