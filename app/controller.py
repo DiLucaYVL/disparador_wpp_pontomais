@@ -2,6 +2,7 @@ from app.processamento.csv_reader import carregar_dados
 from app.whatsapp.mensagem import gerar_mensagens
 from app.whatsapp.mensagem_assinaturas import gerar_mensagens_assinaturas
 from app.routes import enviar_whatsapp
+from app.history import registrar_envio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.whatsapp.numeros_equipes import carregar_numeros_equipes
 from app.processamento.log import configurar_log
@@ -60,19 +61,21 @@ def processar_csv(caminho_csv, ignorar_sabados, tipo_relatorio, equipes_selecion
                 future = executor.submit(
                     enviar_whatsapp, numero, mensagem_final.strip(), equipe_normalizada
                 )
-                futures[future] = titulo
+                futures[future] = (titulo, equipe_normalizada)
                 stats["total"] += 1
                 stats["equipes"].add(equipe_normalizada)
 
         for future in as_completed(futures):
-            titulo = futures[future]
+            titulo, equipe_nome = futures[future]
             try:
                 future.result()
                 logs.append({"type": "success", "message": f" Mensagem enviada para {titulo}"})
                 stats["sucesso"] += 1
+                registrar_envio(equipe_nome, tipo_relatorio, "sucesso")
             except Exception as e:
                 logs.append({"type": "error", "message": f" Erro ao enviar para {titulo}: {str(e)}"})
                 stats["erro"] += 1
+                registrar_envio(equipe_nome, tipo_relatorio, "erro")
 
     else:
         mensagens_por_grupo = gerar_mensagens(df, tipo_relatorio)
@@ -127,19 +130,21 @@ def processar_csv(caminho_csv, ignorar_sabados, tipo_relatorio, equipes_selecion
                 future = executor.submit(
                     enviar_whatsapp, numero, mensagem_final.strip(), equipe
                 )
-                futures[future] = titulo
+                futures[future] = (titulo, equipe)
                 stats["total"] += 1
                 stats["equipes"].add(equipe)
 
         for future in as_completed(futures):
-            titulo = futures[future]
+            titulo, equipe_nome = futures[future]
             try:
                 future.result()
                 logs.append({"type": "success", "message": f" Mensagem enviada para {titulo}"})
                 stats["sucesso"] += 1
+                registrar_envio(equipe_nome, tipo_relatorio, "sucesso")
             except Exception as e:
                 logs.append({"type": "error", "message": f" Erro ao enviar para {titulo}: {str(e)}"})
                 stats["erro"] += 1
+                registrar_envio(equipe_nome, tipo_relatorio, "erro")
 
     if equipes_sem_numero:
         logs.append({"type": "warning", "message": f" Números não encontrados para: {', '.join(equipes_sem_numero)}"})

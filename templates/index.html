@@ -49,10 +49,18 @@
                         <span class="logout-text">Desconectar WhatsApp</span>
                     </button>
                 </div>
-                
+
+                <!-- Link para histórico (visível apenas quando conectado) -->
+                <div id="historySection" class="history-section hidden">
+                    <a href="{{ url_for('historico') }}" class="history-button">
+                        <span class="history-icon">📜</span>
+                        <span class="history-text">Histórico de envios</span>
+                    </a>
+                </div>
+
                 <!-- QR Code Section -->
                 <div id="qrContainer" class="qr-section">
-                    <div class="qr-overlay" > </div>     
+                    <div class="qr-overlay" > </div>
                     <div class="qr-frame">
                         
                         <img id="qrImage" class="qr-code" src="" alt="QR Code">

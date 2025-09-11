@@ -24,6 +24,7 @@ export async function verificarStatusWhatsapp() {
     const mainContent = document.getElementById('mainContent');
     const connectionMessage = document.getElementById('connectionMessage');
     const logoutSection = document.getElementById('logoutSection');
+    const historySection = document.getElementById('historySection');
 
     try {
         // Consulta o status da conexão
@@ -52,6 +53,7 @@ export async function verificarStatusWhatsapp() {
             mainContent.classList.add('hidden');
             connectionMessage.classList.remove('hidden');
             logoutSection.classList.add('hidden');
+            historySection.classList.add('hidden');
 
             // NÃO fazer reconexão automática - deixar manual
             return "CLOSE";
@@ -66,7 +68,7 @@ export async function verificarStatusWhatsapp() {
             try {
                 const qrRes = await createRequestWithTimeout(`${API_BASE_URL}/whatsapp/qr`);
                 const qrData = await qrRes.json();
-                
+
                 if (qrData.base64) {
                     qrImage.src = qrData.base64;
                     qrImage.style.display = "block";
@@ -74,7 +76,7 @@ export async function verificarStatusWhatsapp() {
                 } else {
                     console.warn("QR Code não encontrado na resposta.", qrData);
                 }
-                
+
             } catch (qrError) {
                 console.error("Erro ao obter QR Code:", qrError);
             }
@@ -82,6 +84,7 @@ export async function verificarStatusWhatsapp() {
             mainContent.classList.add('hidden');
             connectionMessage.classList.remove('hidden');
             logoutSection.classList.add('hidden');
+            historySection.classList.add('hidden');
 
             // console.log("🟢 QR Code solicitado");
             return "CONNECTING";
@@ -129,6 +132,7 @@ export async function verificarStatusWhatsapp() {
             mainContent.classList.remove('hidden');
             connectionMessage.classList.add('hidden');
             logoutSection.classList.remove('hidden');
+            historySection.classList.remove('hidden');
             return "OPEN";
         }
 
@@ -144,6 +148,7 @@ export async function verificarStatusWhatsapp() {
             mainContent.classList.add('hidden');
             connectionMessage.classList.remove('hidden');
             logoutSection.classList.add('hidden');
+            historySection.classList.add('hidden');
 
             return "ESTADO DESCONHECIDO: " +state;
         }
@@ -160,6 +165,7 @@ export async function verificarStatusWhatsapp() {
         mainContent.classList.add('hidden');
         connectionMessage.classList.remove('hidden');
         logoutSection.classList.add('hidden');
+        historySection.classList.add('hidden');
 
         return "ERROR";
     }
