@@ -3,52 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Histórico de Envios</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main-content.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+    <title>TopFama | Histórico de Envios</title>
+    <link rel="icon" href="https://lojastopfama.com.br/sobre/topfama_icon.png" type="image/png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/historico.css') }}">
 </head>
 <body>
+    <a href="/" class="back-button">← Voltar ao Início</a>
+
     <div class="container">
+        <!-- Header -->
         <div class="header">
-            <h1>Histórico de Envios</h1>
+            <h1>📊 Histórico de Envios</h1>
+            <p>Acompanhe todos os envios de mensagens realizados pelo sistema</p>
         </div>
-        <div class="content">
-            <div class="card">
-                <h3>Filtros</h3>
-                <div class="filters">
-                    <label>Equipe:
-                        <select id="filtroEquipe">
-                            <option value="">Todas</option>
-                        </select>
-                    </label>
-                    <label>Tipo:
-                        <select id="filtroTipo">
-                            <option value="">Todos</option>
-                            <option value="Auditoria">Auditoria</option>
-                            <option value="Assinaturas">Assinaturas</option>
-                            <option value="Ocorrências">Ocorrências</option>
-                        </select>
-                    </label>
-                    <label>De:
-                        <input type="date" id="filtroInicio">
-                    </label>
-                    <label>Até:
-                        <input type="date" id="filtroFim">
-                    </label>
-                    <button id="aplicarFiltros">Filtrar</button>
+
+        <!-- Counter Card -->
+        <div class="card counter-card">
+            <h3>📈 Total Geral de Envios</h3>
+            <div class="counter-number" id="totalCounter">0</div>
+            <div class="counter-label">envios realizados</div>
+            <div class="counter-breakdown">
+                <div class="breakdown-item">
+                    <span class="success">✅</span>
+                    <span id="successTotal">0</span>
+                    <span>sucessos</span>
+                </div>
+                <div class="breakdown-item">
+                    <span class="error">❌</span>
+                    <span id="errorTotal">0</span>
+                    <span>falhas</span>
                 </div>
             </div>
+        </div>
 
-            <div class="card">
-                <h3>Resumo por Status</h3>
-                <div class="grafico-container">
-                    <canvas id="graficoStatus"></canvas>
+        <!-- Filters Card -->
+        <div class="card">
+            <h3>🔍 Filtros</h3>
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Equipe:</label>
+                    <div class="custom-dropdown">
+                        <div class="dropdown-header" id="equipeDropdownHeader">
+                            <span id="equipeSelectedText">Todas as equipes</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </div>
+                        <div class="dropdown-content" id="equipeDropdownContent">
+                            <div class="dropdown-item selected" data-value="">Todas as equipes</div>
+                        </div>
+                        <input type="hidden" id="filtroEquipe" value="">
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Tipo de Relatório:</label>
+                    <div class="custom-dropdown">
+                        <div class="dropdown-header" id="tipoDropdownHeader">
+                            <span id="tipoSelectedText">Todos os tipos</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </div>
+                        <div class="dropdown-content" id="tipoDropdownContent">
+                            <div class="dropdown-item selected" data-value="">Todos os tipos</div>
+                            <div class="dropdown-item" data-value="Auditoria">🔍 Auditoria</div>
+                            <div class="dropdown-item" data-value="Assinaturas">📝 Assinaturas</div>
+                            <div class="dropdown-item" data-value="Ocorrências">⚠️ Ocorrências</div>
+                        </div>
+                        <input type="hidden" id="filtroTipo" value="">
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Data Inicial:</label>
+                    <input type="date" id="filtroInicio" class="date-input">
+                </div>
+
+                <div class="filter-group">
+                    <label>Data Final:</label>
+                    <input type="date" id="filtroFim" class="date-input">
+                </div>
+
+                <div class="filter-group" style="display: flex; align-items: end;">
+                    <button id="aplicarFiltros" class="filter-button">
+                        🔄 Aplicar Filtros
+                    </button>
                 </div>
             </div>
+        </div>
 
-            <div class="card">
-                <h3>Registros</h3>
+        <!-- Chart Card -->
+        <div class="card">
+            <h3>📊 Envios por Equipe</h3>
+            <div class="chart-container">
+                <canvas id="graficoEquipes"></canvas>
+            </div>
+        </div>
+
+        <!-- Table Card -->
+        <div class="card">
+            <h3>📋 Registros Detalhados</h3>
+            <div id="loadingIndicator" class="loading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>Carregando dados...</p>
+            </div>
+            <div class="table-container">
                 <table id="tabelaEnvios">
                     <thead>
                         <tr>
@@ -63,7 +119,8 @@
             </div>
         </div>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script type="module" src="{{ url_for('static', filename='js/historico.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/historico.js') }}"></script>
 </body>
 </html>
