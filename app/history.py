@@ -17,7 +17,7 @@ def init_db() -> None:
             (
                 "CREATE TABLE IF NOT EXISTS envios ("
                 "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                "data_envio TEXT NOT NULL,"
+                "data_envio DATETIME NOT NULL,"
                 "equipe TEXT NOT NULL,"
                 "tipo_relatorio TEXT NOT NULL,"
                 "status TEXT NOT NULL"
@@ -30,7 +30,7 @@ def init_db() -> None:
 def registrar_envio(equipe: str, tipo_relatorio: str, status: str) -> None:
     """Registra um envio na base de dados."""
     init_db()
-    data_envio = datetime.utcnow().isoformat()
+    data_envio = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             "INSERT INTO envios (data_envio, equipe, tipo_relatorio, status) VALUES (?, ?, ?, ?)",
@@ -57,15 +57,30 @@ def listar_envios(
     if tipo:
         query.append("AND tipo_relatorio = ?")
         params.append(tipo)
-    if inicio:
-        query.append("AND date(data_envio) >= date(?)")
-        params.append(inicio)
-    if fim:
-        query.append("AND date(data_envio) <= date(?)")
-        params.append(fim)
-    query.append("ORDER BY data_envio DESC")
+    query.append("ORDER BY id DESC")
     sql = " ".join(query)
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(sql, params).fetchall()
-    return [dict(row) for row in rows]
+    registros = [dict(row) for row in rows]
+    if inicio:
+        inicio_dt = datetime.strptime(inicio, "%Y-%m-%d").date()
+        registros = [
+            r
+            for r in registros
+            if datetime.strptime(r["data_envio"], "%d/%m/%Y %H:%M:%S").date()
+            >= inicio_dt
+        ]
+    if fim:
+        fim_dt = datetime.strptime(fim, "%Y-%m-%d").date()
+        registros = [
+            r
+            for r in registros
+            if datetime.strptime(r["data_envio"], "%d/%m/%Y %H:%M:%S").date()
+            <= fim_dt
+        ]
+    registros.sort(
+        key=lambda r: datetime.strptime(r["data_envio"], "%d/%m/%Y %H:%M:%S"),
+        reverse=True,
+    )
+    return registros
