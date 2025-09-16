@@ -15,7 +15,7 @@ from app.config.settings import (
     EVOLUTION_TOKEN,
     EVOLUTION_URL,
 )
-from app.history import listar_envios
+from app.history import listar_envios, listar_equipes_disponiveis
 
 api_bp = Blueprint('api', __name__)
 UPLOAD_FOLDER = 'uploads'
@@ -27,7 +27,11 @@ def _evo_headers():
 
 
 def verificar_sessao() -> bool:
-    """Garante que a sessão do WhatsApp esteja ativa."""
+    """Garante que a sessão do WhatsApp esteja ativa.
+
+    A Evolution pode retornar lista de instâncias ou um objeto.
+    Esta função trata ambos para evitar erros do tipo 'list' não possui 'get'.
+    """
     url = urljoin(
         EVOLUTION_URL,
         f"/instance/fetchInstances?instanceName={EVOLUTION_INSTANCE}",
@@ -36,11 +40,36 @@ def verificar_sessao() -> bool:
         resp = requests.get(url, headers=_evo_headers(), timeout=30)
         resp.raise_for_status()
         data = resp.json()
-        estado = (
-            data.get("state")
-            or data.get("connectionState")
-            or data.get("instance", {}).get("state")
-        )
+
+        estado = None
+        if isinstance(data, list):
+            try:
+                alvo = next(
+                    (
+                        item for item in data
+                        if isinstance(item, dict)
+                        and (
+                            item.get("instanceName") == EVOLUTION_INSTANCE
+                            or item.get("instance", {}).get("instanceName") == EVOLUTION_INSTANCE
+                        )
+                    ),
+                    data[0] if data else {},
+                )
+            except Exception:  # noqa: BLE001
+                alvo = {}
+            if isinstance(alvo, dict):
+                estado = (
+                    alvo.get("state")
+                    or alvo.get("connectionState")
+                    or alvo.get("instance", {}).get("state")
+                )
+        elif isinstance(data, dict):
+            estado = (
+                data.get("state")
+                or data.get("connectionState")
+                or data.get("instance", {}).get("state")
+            )
+
         if isinstance(estado, str) and estado.lower() == "open":
             return True
     except Exception as exc:  # noqa: BLE001
@@ -51,11 +80,13 @@ def verificar_sessao() -> bool:
         resp = requests.get(url, headers=_evo_headers(), timeout=30)
         resp.raise_for_status()
         data = resp.json()
-        estado = (
-            data.get("state")
-            or data.get("connectionState")
-            or data.get("instance", {}).get("state")
-        )
+        estado = None
+        if isinstance(data, dict):
+            estado = (
+                data.get("state")
+                or data.get("connectionState")
+                or data.get("instance", {}).get("state")
+            )
         return isinstance(estado, str) and estado.lower() == "open"
     except Exception as exc:  # noqa: BLE001
         logging.error("Erro ao conectar instância: %s", exc)
@@ -309,4 +340,15 @@ def historico_envios():
     inicio = request.args.get('inicio')
     fim = request.args.get('fim')
     dados = listar_envios(equipe=equipe, tipo=tipo, inicio=inicio, fim=fim)
-    return jsonify({"success": True, "dados": dados})
+    resumo = {
+        "total": len(dados),
+        "sucessos": sum(1 for item in dados if item.get('status') == 'sucesso'),
+        "erros": sum(1 for item in dados if item.get('status') == 'erro'),
+    }
+    equipes_disponiveis = listar_equipes_disponiveis()
+    return jsonify({
+        "success": True,
+        "dados": dados,
+        "resumo": resumo,
+        "equipes": equipes_disponiveis,
+    })

@@ -1,5 +1,7 @@
 let graficoPorEquipe;
 let dados = [];
+let resumoAtual = { total: 0, sucessos: 0, erros: 0 };
+let equipesDisponiveis = [];
 
 // Configurar dropdowns
 function setupDropdowns() {
@@ -87,15 +89,30 @@ async function carregarDados() {
   try {
     const resp = await fetch(`/historico/dados?${params.toString()}`);
     const data = await resp.json();
-    if (data.success) {
-      dados = data.dados;
-      preencherTabela(dados);
-      atualizarEquipeSelect(dados);
-      atualizarContadores(dados);
-      atualizarGraficoEquipes(dados);
+
+    if (!resp.ok || !data.success) {
+      throw new Error(data.error || 'Falha ao consultar histórico.');
     }
+
+    dados = Array.isArray(data.dados) ? data.dados : [];
+    resumoAtual = data.resumo || {
+      total: dados.length,
+      sucessos: dados.filter((d) => (d.status || '').toLowerCase() === 'sucesso').length,
+      erros: dados.filter((d) => (d.status || '').toLowerCase() === 'erro').length,
+    };
+    equipesDisponiveis = Array.isArray(data.equipes) ? data.equipes : [];
+
+    preencherTabela(dados);
+    atualizarEquipeSelect(equipesDisponiveis);
+    atualizarContadores(resumoAtual);
+    atualizarGraficoEquipes(dados);
   } catch (error) {
     console.error('Erro ao carregar dados:', error);
+    dados = [];
+    resumoAtual = { total: 0, sucessos: 0, erros: 0 };
+    preencherTabela([]);
+    atualizarContadores(resumoAtual);
+    atualizarGraficoEquipes([]);
   } finally {
     loadingIndicator.style.display = 'none';
   }
@@ -106,33 +123,86 @@ function preencherTabela(dados) {
   const tbody = document.querySelector('#tabelaEnvios tbody');
   tbody.innerHTML = '';
 
+  if (!dados.length) {
+    const linhaVazia = document.createElement('tr');
+    const coluna = document.createElement('td');
+    coluna.colSpan = 6;
+    coluna.className = 'empty-row';
+    coluna.textContent = 'Nenhum envio encontrado para os filtros selecionados.';
+    linhaVazia.appendChild(coluna);
+    tbody.appendChild(linhaVazia);
+    return;
+  }
+
   dados.forEach((row) => {
     const tr = document.createElement('tr');
-    const dataFormatada = new Date(row.data_envio).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const statusClass = row.status === 'sucesso' ? 'status-success' : 'status-error';
-    const statusIcon = row.status === 'sucesso' ? '✅' : '❌';
-    tr.innerHTML = `
-      <td>${dataFormatada}</td>
-      <td>${row.equipe}</td>
-      <td>${row.tipo_relatorio}</td>
-      <td><span class="status-badge ${statusClass}">${statusIcon} ${row.status}</span></td>
-    `;
+
+    const dataTd = document.createElement('td');
+    dataTd.textContent = formatarData(row.data_envio);
+    tr.appendChild(dataTd);
+
+    const equipeTd = document.createElement('td');
+    equipeTd.textContent = row.equipe || 'N/A';
+    tr.appendChild(equipeTd);
+
+    const tipoTd = document.createElement('td');
+    tipoTd.textContent = row.tipo_relatorio || 'N/A';
+    tr.appendChild(tipoTd);
+
+    const pessoaTd = document.createElement('td');
+    pessoaTd.textContent = row.pessoa || 'N/A';
+    tr.appendChild(pessoaTd);
+
+    const motivoTd = document.createElement('td');
+    motivoTd.textContent = row.motivo_envio || 'N/A';
+    tr.appendChild(motivoTd);
+
+    const statusTd = document.createElement('td');
+    const statusBadge = document.createElement('span');
+    const statusNormalizado = (row.status || '').toLowerCase();
+    const statusClass = statusNormalizado === 'sucesso' ? 'status-success' : 'status-error';
+    const statusTexto = statusNormalizado === 'sucesso' ? 'sucesso' : (row.status || 'indefinido');
+    const statusIcon = statusNormalizado === 'sucesso' ? '✅' : '⚠️';
+    statusBadge.className = `status-badge ${statusClass}`;
+    statusBadge.textContent = `${statusIcon} ${statusTexto}`;
+    statusTd.appendChild(statusBadge);
+    tr.appendChild(statusTd);
+
     tbody.appendChild(tr);
   });
 }
 
-// Atualizar contadores
-function atualizarContadores(dados) {
+function formatarData(dataTexto) {
+  if (!dataTexto) {
+    return 'N/A';
+  }
 
-  const total = dados.length;
-  const sucessos = dados.filter((d) => d.status === 'sucesso').length;
-  const erros = dados.filter((d) => d.status === 'erro').length;
+  // Tenta interpretar ISO ou formato americano
+  const tentativaIso = new Date(dataTexto);
+  if (!Number.isNaN(tentativaIso.getTime())) {
+    return tentativaIso.toLocaleString('pt-BR', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+  }
+
+  const partes = dataTexto.split(' ');
+  if (partes.length >= 2) {
+    const [dataParte, horaParte] = partes;
+    const [dia, mes, ano] = dataParte.split('/');
+    if (dia && mes && ano) {
+      return `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${ano} ${horaParte || ''}`.trim();
+    }
+  }
+
+  return dataTexto;
+}
+
+// Atualizar contadores
+function atualizarContadores(resumo) {
+  const total = resumo?.total ?? 0;
+  const sucessos = resumo?.sucessos ?? 0;
+  const erros = resumo?.erros ?? 0;
 
   document.getElementById('totalCounter').textContent = total;
   document.getElementById('successTotal').textContent = sucessos;
@@ -140,25 +210,42 @@ function atualizarContadores(dados) {
 }
 
 // Atualizar dropdown de equipes
-function atualizarEquipeSelect(dados) {
-  const equipes = [...new Set(dados.map((d) => d.equipe))].sort();
+function atualizarEquipeSelect(equipes) {
   const equipeContent = document.getElementById('equipeDropdownContent');
-  const currentValue = document.getElementById('filtroEquipe').value;
+  const selectedValue = document.getElementById('filtroEquipe').value;
+  let selectedLabel = 'Todas as equipes';
+  let selecionadoExiste = false;
 
-  // Manter opção "Todas"
-  equipeContent.innerHTML = '<div class="dropdown-item selected" data-value="">Todas as equipes</div>';
+  equipeContent.innerHTML = '';
 
-  equipes.forEach((equipe) => {
+  const criarItem = (valor, texto) => {
     const item = document.createElement('div');
     item.className = 'dropdown-item';
-    item.setAttribute('data-value', equipe);
-    item.textContent = equipe;
-    if (equipe === currentValue) {
+    item.dataset.value = valor;
+    item.textContent = texto;
+    if (valor === selectedValue) {
       item.classList.add('selected');
-      document.getElementById('equipeSelectedText').textContent = equipe;
+      selectedLabel = texto;
+      selecionadoExiste = true;
     }
     equipeContent.appendChild(item);
+  };
+
+  criarItem('', 'Todas as equipes');
+  (equipes || []).forEach((equipe) => {
+    if (!equipe) {
+      return;
+    }
+    criarItem(equipe, equipe);
   });
+
+  if (!selecionadoExiste) {
+    document.getElementById('filtroEquipe').value = '';
+    selectedLabel = 'Todas as equipes';
+    equipeContent.firstChild.classList.add('selected');
+  }
+
+  document.getElementById('equipeSelectedText').textContent = selectedLabel;
 }
 
 // Atualizar gráfico por equipes
@@ -167,10 +254,16 @@ function atualizarGraficoEquipes(dados) {
 
   const equipeCounts = {};
   dados.forEach((item) => {
-    if (!equipeCounts[item.equipe]) {
-      equipeCounts[item.equipe] = { sucesso: 0, erro: 0 };
+    const equipeNome = item.equipe || 'Não informado';
+    const status = (item.status || '').toLowerCase();
+    if (!equipeCounts[equipeNome]) {
+      equipeCounts[equipeNome] = { sucesso: 0, erro: 0 };
     }
-    equipeCounts[item.equipe][item.status]++;
+    if (status === 'sucesso') {
+      equipeCounts[equipeNome].sucesso += 1;
+    } else if (status === 'erro') {
+      equipeCounts[equipeNome].erro += 1;
+    }
   });
 
   const equipes = Object.keys(equipeCounts).sort();
@@ -179,6 +272,11 @@ function atualizarGraficoEquipes(dados) {
 
   if (graficoPorEquipe) {
     graficoPorEquipe.destroy();
+    graficoPorEquipe = null;
+  }
+
+  if (!equipes.length) {
+    return;
   }
 
   graficoPorEquipe = new Chart(ctx, {

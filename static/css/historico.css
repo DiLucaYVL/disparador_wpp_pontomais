@@ -313,6 +313,12 @@ table td {
     font-size: 0.9rem;
 }
 
+.empty-row {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+}
+
 table tbody tr:hover {
     background: #f8f9fa;
 }
