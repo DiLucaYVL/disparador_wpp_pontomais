@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, TypedDict
 
 import pandas as pd
 
@@ -65,8 +65,15 @@ def _extrair_meses(periodos: List[str]) -> List[str]:
 
     return meses
 
+class DadosAssinatura(TypedDict):
+    """Estrutura com a mensagem final e os colaboradores pendentes."""
 
-def gerar_mensagens_assinaturas(df: pd.DataFrame) -> Dict[str, str]:
+    mensagem: str
+    nomes: List[str]
+    motivo: str
+
+
+def gerar_mensagens_assinaturas(df: pd.DataFrame) -> Dict[str, DadosAssinatura]:
     """Gera um dicionário de mensagens por equipe para o relatório de Assinaturas.
 
     Retorna um dicionário {equipe_tratada: mensagem_final} para cada equipe que
@@ -75,7 +82,7 @@ def gerar_mensagens_assinaturas(df: pd.DataFrame) -> Dict[str, str]:
     Caso a coluna ``Assinado?`` esteja presente, apenas colaboradores com valor
     "Não" permanecerão na lista e, consequentemente, na prévia de envio.
     """
-    mensagens = {}
+    mensagens: Dict[str, DadosAssinatura] = {}
     if df.empty:
         return mensagens
 
@@ -111,6 +118,11 @@ def gerar_mensagens_assinaturas(df: pd.DataFrame) -> Dict[str, str]:
             f"Por favor assinar o espelho ponto {frase_mes}\n"
             f"{linhas}"
         ).strip()
-        mensagens[equipe] = mensagem
+        motivo = f"Assinatura pendente {frase_mes}"
+        mensagens[equipe] = {
+            "mensagem": mensagem,
+            "nomes": nomes,
+            "motivo": motivo,
+        }
 
     return mensagens

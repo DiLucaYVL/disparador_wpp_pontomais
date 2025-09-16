@@ -1,5 +1,8 @@
 import unicodedata
+from typing import List, Optional
+
 from app.processamento.ocorrencias_processor import processar_ocorrencias
+from app.types import MensagemDetalhada
 
 # === Templates para relatório de Auditoria ===
 TEMPLATES = {
@@ -48,7 +51,8 @@ def normalizar(texto):
 
 # === Geração de mensagem individual por grupo (Nome + Data) ===
 
-def gerar_mensagem(grupo):
+
+def gerar_mensagem(grupo) -> Optional[MensagemDetalhada]:
     nome = grupo["Nome"].iloc[0]
     data = grupo["Data"].iloc[0]
     ocorrencias = grupo.set_index("Ocorrência")["Valor"].astype(str).to_dict()
@@ -56,8 +60,9 @@ def gerar_mensagem(grupo):
     # Normaliza as chaves e valores
     ocorrencias_norm = {normalizar(k): normalizar(v) for k, v in ocorrencias.items()}
 
-    msgs = []
+    msgs: List[str] = []
     mensagens_set = set()
+    motivos_utilizados: List[str] = []
 
     # Verifica se há falta justificada/abonada para a mesma pessoa e data
     # Agora, verifica a nova coluna 'FaltaAbonadaJustificada' no grupo
@@ -77,7 +82,10 @@ def gerar_mensagem(grupo):
     if tem_falta and tem_horas_faltantes:
         valor_faltante = ocorrencias.get("Horas Faltantes") or ocorrencias.get("horas faltantes")
         msg = f"*{nome}* _faltou_ e _ficou devendo_ *{formatar_horas(valor_faltante)}*. Por favor *ajustar*."
-        return msg
+        return MensagemDetalhada(
+            texto=msg,
+            motivos=["Falta", "Horas Faltantes"],
+        )
 
     
     for index, row in grupo.iterrows(): # Itera sobre as linhas do grupo, não apenas as chaves de ocorrencias
@@ -127,8 +135,15 @@ def gerar_mensagem(grupo):
         if msg and msg not in mensagens_set:
             msgs.append(msg)
             mensagens_set.add(msg)
+            motivo = ocorr.strip()
+            if motivo and motivo not in motivos_utilizados:
+                motivos_utilizados.append(motivo)
 
-    return "\n".join(msgs) if msgs else None
+    if not msgs:
+        return None
+
+    motivos = [m for m in motivos_utilizados if m]
+    return MensagemDetalhada(texto="\n".join(msgs), motivos=motivos)
 
 # === Gera todas as mensagens agrupadas por Nome + Data ===
 
