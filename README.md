@@ -133,7 +133,13 @@ venv\Scripts\activate     # Windows
 3. **Instale as dependências:**
 ```bash
 pip install -r requirements.txt
+pip install mysql-connector-python
 ```
+
+> 💡 **Observação:** O pacote `mysql-connector-python` é necessário para o
+> registro do histórico em banco de dados MySQL e precisa ser instalado
+> separadamente enquanto o arquivo `requirements.txt` não é convertido para
+> UTF-8.
 
 4. **Configure as variáveis de ambiente:**
 ```bash

@@ -11,6 +11,7 @@ from collections import defaultdict
 from datetime import datetime
 import logging
 import pandas as pd
+from app.types import MensagemDetalhada
 
 def processar_csv(caminho_csv, ignorar_sabados, tipo_relatorio, equipes_selecionadas=None):
     nome_arquivo_log = configurar_log()
@@ -41,8 +42,9 @@ def processar_csv(caminho_csv, ignorar_sabados, tipo_relatorio, equipes_selecion
     if tipo_relatorio == "Assinaturas":
         mensagens_por_equipe = gerar_mensagens_assinaturas(df)
         futures = {}
+        historico_por_equipe = defaultdict(list)
         with ThreadPoolExecutor(max_workers=5) as executor:
-            for equipe, mensagem_final in sorted(mensagens_por_equipe.items()):
+            for equipe, dados in sorted(mensagens_por_equipe.items()):
                 equipe_normalizada = str(equipe).strip().upper()
                 if equipes_selecionadas:
                     equipes_normalizadas = {e.strip().upper() for e in equipes_selecionadas}
@@ -58,35 +60,76 @@ def processar_csv(caminho_csv, ignorar_sabados, tipo_relatorio, equipes_selecion
                 equipe_original = df[df["EquipeTratada"] == equipe_normalizada]["Equipe"].iloc[0]
                 titulo = f"LOJA {equipe_normalizada}" if eh_loja(equipe_original) else f"{equipe_normalizada}"
 
+                mensagem_final = dados["mensagem"].strip()
                 future = executor.submit(
-                    enviar_whatsapp, numero, mensagem_final.strip(), equipe_normalizada
+                    enviar_whatsapp, numero, mensagem_final, equipe_normalizada
                 )
                 futures[future] = (titulo, equipe_normalizada)
                 stats["total"] += 1
                 stats["equipes"].add(equipe_normalizada)
 
+                motivo = str(dados.get("motivo", "")).strip() or "Assinatura pendente"
+                nomes_registrados = []
+                for nome in dados.get("nomes", []):
+                    nome_limpo = str(nome).strip()
+                    if not nome_limpo:
+                        continue
+                    nomes_registrados.append((nome_limpo, motivo))
+                if nomes_registrados:
+                    historico_por_equipe[equipe_normalizada].extend(nomes_registrados)
+
         for future in as_completed(futures):
             titulo, equipe_nome = futures[future]
+            registros = historico_por_equipe.get(equipe_nome, [])
             try:
                 future.result()
                 logs.append({"type": "success", "message": f" Mensagem enviada para {titulo}"})
                 stats["sucesso"] += 1
-                registrar_envio(equipe_nome, tipo_relatorio, "sucesso")
+                for pessoa, motivo in registros:
+                    registrar_envio(
+                        equipe_nome,
+                        tipo_relatorio,
+                        "sucesso",
+                        pessoa=pessoa,
+                        motivo_envio=motivo,
+                    )
             except Exception as e:
                 logs.append({"type": "error", "message": f" Erro ao enviar para {titulo}: {str(e)}"})
                 stats["erro"] += 1
-                registrar_envio(equipe_nome, tipo_relatorio, "erro")
+                for pessoa, motivo in registros:
+                    registrar_envio(
+                        equipe_nome,
+                        tipo_relatorio,
+                        "erro",
+                        pessoa=pessoa,
+                        motivo_envio=motivo,
+                    )
 
     else:
         mensagens_por_grupo = gerar_mensagens(df, tipo_relatorio)
         mensagens_por_equipe_data = defaultdict(lambda: defaultdict(list))
+        historico_por_equipe = defaultdict(list)
 
-        for (nome, data), mensagem in mensagens_por_grupo.items():
+        for (nome, data), detalhes in mensagens_por_grupo.items():
+            if not isinstance(detalhes, MensagemDetalhada):
+                continue
+
             equipe_match = df.loc[(df["Nome"] == nome) & (df["Data"] == data), "EquipeTratada"]
             if equipe_match.empty:
                 continue
             equipe = equipe_match.iloc[0]
-            mensagens_por_equipe_data[equipe][data].append(mensagem)
+            mensagens_por_equipe_data[equipe][data].append(detalhes.texto)
+
+            nome_formatado = str(nome).strip()
+            motivos_unicos = []
+            for motivo in detalhes.motivos:
+                motivo_limpo = str(motivo).strip()
+                if motivo_limpo and motivo_limpo not in motivos_unicos:
+                    motivos_unicos.append(motivo_limpo)
+
+            if nome_formatado:
+                motivo_texto = "; ".join(motivos_unicos) or "Motivo não informado"
+                historico_por_equipe[equipe].append((nome_formatado, motivo_texto))
 
         futures = {}
         with ThreadPoolExecutor(max_workers=5) as executor:
@@ -136,15 +179,30 @@ def processar_csv(caminho_csv, ignorar_sabados, tipo_relatorio, equipes_selecion
 
         for future in as_completed(futures):
             titulo, equipe_nome = futures[future]
+            registros = historico_por_equipe.get(equipe_nome, [])
             try:
                 future.result()
                 logs.append({"type": "success", "message": f" Mensagem enviada para {titulo}"})
                 stats["sucesso"] += 1
-                registrar_envio(equipe_nome, tipo_relatorio, "sucesso")
+                for pessoa, motivo in registros:
+                    registrar_envio(
+                        equipe_nome,
+                        tipo_relatorio,
+                        "sucesso",
+                        pessoa=pessoa,
+                        motivo_envio=motivo,
+                    )
             except Exception as e:
                 logs.append({"type": "error", "message": f" Erro ao enviar para {titulo}: {str(e)}"})
                 stats["erro"] += 1
-                registrar_envio(equipe_nome, tipo_relatorio, "erro")
+                for pessoa, motivo in registros:
+                    registrar_envio(
+                        equipe_nome,
+                        tipo_relatorio,
+                        "erro",
+                        pessoa=pessoa,
+                        motivo_envio=motivo,
+                    )
 
     if equipes_sem_numero:
         logs.append({"type": "warning", "message": f" Números não encontrados para: {', '.join(equipes_sem_numero)}"})
