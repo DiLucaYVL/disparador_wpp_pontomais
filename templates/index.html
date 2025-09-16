@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dropdown.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/logs.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/stats.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/matrix.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
 </head>
 <body>
@@ -189,6 +190,14 @@
                             <div id="errorCount" class="stat-number">0</div>
                             <div class="stat-label">Erros</div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Matrix Summary Card -->
+                <div class="card">
+                    <h3><span class="icon">📈</span>Resumo Interativo</h3>
+                    <div id="matrixContainer" class="matrix-container">
+                        <div class="matrix-empty">Envie um arquivo CSV para visualizar o resumo consolidado.</div>
                     </div>
                 </div>
 

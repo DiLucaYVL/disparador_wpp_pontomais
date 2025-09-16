@@ -198,6 +198,7 @@ def status(task_id):
             "stats": result["stats"],
             "debug": result.get("debug"),
             "nome_arquivo_log": result.get("nome_arquivo_log"),
+            "resumo": result.get("resumo", []),
         })
 
     if task["status"] == "error":

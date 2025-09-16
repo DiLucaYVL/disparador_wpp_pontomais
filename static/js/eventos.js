@@ -2,6 +2,7 @@ import { gerarFormData } from './helpers.js';
 import { enviarCSV, obterStatus } from './api.js';
 import { mostrarLogs, atualizarEstatisticas, mostrarDebug, atualizarBarraProgresso } from './ui.js';
 import { carregarDropdownEquipes } from './dropdown.js';
+import { atualizarResumoMatriz } from './matriz.js';
 
 // URL base da API interna (origem atual)
 const API_BASE_URL = window.location.origin;
@@ -82,6 +83,10 @@ export function configurarEventos() {
         const formData = gerarFormData(fileAtual, ignorarSabados, debugMode, equipesSelecionadas, tipoRelatorio);
 
         atualizarBarraProgresso("25%");
+        const matrixContainer = document.getElementById('matrixContainer');
+        if (matrixContainer) {
+            matrixContainer.innerHTML = '<div class="matrix-empty">Gerando resumo consolidado...</div>';
+        }
         console.info("📦 Enviando arquivo:", arquivoSelecionado);
 
         try {
@@ -92,6 +97,7 @@ export function configurarEventos() {
 
             mostrarLogs(resultado.log);
             atualizarEstatisticas(resultado.stats);
+            atualizarResumoMatriz(resultado.resumo);
             atualizarBarraProgresso("100%");
 
             if (debugMode && resultado.debug) {

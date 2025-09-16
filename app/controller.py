@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.whatsapp.numeros_equipes import carregar_numeros_equipes
 from app.processamento.log import configurar_log
 from app.processamento.mapear_gerencia import eh_loja
+from app.processamento.resumo_matricial import gerar_resumo_matricial
 from collections import defaultdict
 from datetime import datetime
 import logging
@@ -32,6 +33,7 @@ def processar_csv(caminho_csv, ignorar_sabados, tipo_relatorio, equipes_selecion
     df["EquipeTratada"] = df["EquipeTratada"].astype(str).str.strip().str.upper()
 
     numero_equipe = carregar_numeros_equipes()
+    resumo_matricial = gerar_resumo_matricial(df, tipo_relatorio)
 
     logs = []
     equipes_sem_numero = []
@@ -146,4 +148,4 @@ def processar_csv(caminho_csv, ignorar_sabados, tipo_relatorio, equipes_selecion
 
     stats["equipes"] = len(stats["equipes"])
     logging.info(">>> Finalizando processamento CSV. Total de equipes: %d", stats["total"])
-    return logs, stats, nome_arquivo_log
+    return logs, stats, nome_arquivo_log, resumo_matricial

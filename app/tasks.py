@@ -20,7 +20,7 @@ def enqueue_csv_processing(filepath: str, ignorar_sabados: bool, tipo_relatorio:
     def _run():
         _tasks[task_id]["status"] = "running"
         try:
-            logs, stats, nome_arquivo_log = processar_csv(
+            logs, stats, nome_arquivo_log, resumo_matricial = processar_csv(
                 filepath, ignorar_sabados, tipo_relatorio, equipes_selecionadas
             )
 
@@ -41,6 +41,7 @@ def enqueue_csv_processing(filepath: str, ignorar_sabados: bool, tipo_relatorio:
                 "logs": logs,
                 "stats": stats,
                 "nome_arquivo_log": nome_arquivo_log,
+                "resumo": resumo_matricial,
                 "debug": debug_data,
             }
             _tasks[task_id]["status"] = "done"
