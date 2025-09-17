@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 import os
 import json
@@ -6,6 +6,7 @@ import logging
 import uuid
 import random
 import time
+from datetime import datetime
 import requests
 from urllib.parse import urljoin
 from app.processamento.mapear_gerencia import mapear_equipe
@@ -16,6 +17,7 @@ from app.config.settings import (
     EVOLUTION_URL,
 )
 from app.history import listar_envios, listar_equipes_disponiveis
+from app.history_export import gerar_planilha_historico
 
 api_bp = Blueprint('api', __name__)
 UPLOAD_FOLDER = 'uploads'
@@ -335,11 +337,25 @@ def whatsapp_logout():
 @api_bp.route('/historico/dados', methods=['GET'])
 def historico_envios():
     """Retorna o histórico de envios com filtros opcionais."""
-    equipe = request.args.get('equipe')
-    tipo = request.args.get('tipo')
+    equipes_param = [valor.strip() for valor in request.args.getlist('equipes') if valor and valor.strip()]
+    tipos_param = [valor.strip() for valor in request.args.getlist('tipos') if valor and valor.strip()]
+
+    single_equipe = (request.args.get('equipe') or '').strip()
+    if single_equipe and not equipes_param:
+        equipes_param = [single_equipe]
+
+    single_tipo = (request.args.get('tipo') or '').strip()
+    if single_tipo and not tipos_param:
+        tipos_param = [single_tipo]
+
     inicio = request.args.get('inicio')
     fim = request.args.get('fim')
-    dados = listar_envios(equipe=equipe, tipo=tipo, inicio=inicio, fim=fim)
+    dados = listar_envios(
+        equipe=equipes_param or None,
+        tipo=tipos_param or None,
+        inicio=inicio,
+        fim=fim,
+    )
     resumo = {
         "total": len(dados),
         "sucessos": sum(1 for item in dados if item.get('status') == 'sucesso'),
@@ -352,3 +368,37 @@ def historico_envios():
         "resumo": resumo,
         "equipes": equipes_disponiveis,
     })
+
+
+@api_bp.route('/historico/exportar', methods=['GET'])
+def exportar_historico():
+    """Gera um arquivo Excel com o histórico no formato hierárquico."""
+    equipes_param = [valor.strip() for valor in request.args.getlist('equipes') if valor and valor.strip()]
+    tipos_param = [valor.strip() for valor in request.args.getlist('tipos') if valor and valor.strip()]
+
+    single_equipe = (request.args.get('equipe') or '').strip()
+    if single_equipe and not equipes_param:
+        equipes_param = [single_equipe]
+
+    single_tipo = (request.args.get('tipo') or '').strip()
+    if single_tipo and not tipos_param:
+        tipos_param = [single_tipo]
+
+    inicio = request.args.get('inicio')
+    fim = request.args.get('fim')
+
+    registros = listar_envios(
+        equipe=equipes_param or None,
+        tipo=tipos_param or None,
+        inicio=inicio,
+        fim=fim,
+    )
+    arquivo = gerar_planilha_historico(registros)
+
+    nome_arquivo = f"historico-envios_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return send_file(
+        arquivo,
+        as_attachment=True,
+        download_name=nome_arquivo,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )

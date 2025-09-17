@@ -11,8 +11,8 @@ _tasks = {}
 
 
 def enqueue_csv_processing(filepath: str, ignorar_sabados: bool, tipo_relatorio: str,
-                           equipes_selecionadas: Optional[set] = None,
-                           debug_mode: bool = False) -> str:
+    equipes_selecionadas: Optional[set] = None,
+    debug_mode: bool = False) -> str:
     """Agenda o processamento do CSV em background."""
     task_id = uuid.uuid4().hex
     _tasks[task_id] = {"status": "queued", "result": None, "error": None}

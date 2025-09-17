@@ -197,8 +197,8 @@ def registrar_envio(
 
 
 def listar_envios(
-    equipe: Optional[str] = None,
-    tipo: Optional[str] = None,
+    equipe: Optional[object] = None,
+    tipo: Optional[object] = None,
     inicio: Optional[str] = None,
     fim: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
@@ -208,12 +208,36 @@ def listar_envios(
         "SELECT data_envio, equipe, tipo_relatorio, status, pessoa, motivo_envio FROM envios WHERE 1=1"
     ]
     params: List[Any] = []
-    if equipe:
-        query.append("AND equipe = %s")
-        params.append(equipe)
-    if tipo:
-        query.append("AND tipo_relatorio = %s")
-        params.append(tipo)
+
+    def _prepare_lista(valor: object) -> List[str]:
+        if valor is None:
+            return []
+        if isinstance(valor, (list, tuple, set)):
+            return [str(item).strip() for item in valor if str(item).strip()]
+        texto = str(valor).strip()
+        return [texto] if texto else []
+
+    equipes = _prepare_lista(equipe)
+    tipos = _prepare_lista(tipo)
+
+    if equipes:
+        if len(equipes) == 1:
+            query.append("AND equipe = %s")
+            params.append(equipes[0])
+        else:
+            placeholders = ', '.join(['%s'] * len(equipes))
+            query.append(f"AND equipe IN ({placeholders})")
+            params.extend(equipes)
+
+    if tipos:
+        if len(tipos) == 1:
+            query.append("AND tipo_relatorio = %s")
+            params.append(tipos[0])
+        else:
+            placeholders = ', '.join(['%s'] * len(tipos))
+            query.append(f"AND tipo_relatorio IN ({placeholders})")
+            params.extend(tipos)
+
     if inicio:
         query.append("AND DATE(data_envio) >= %s")
         params.append(inicio)
@@ -228,7 +252,7 @@ def listar_envios(
             cursor.execute(sql, params)
             rows = cursor.fetchall()
         except MySQLError as exc:  # noqa: BLE001
-            logging.error("Erro ao consultar histórico: %s", exc)
+            logging.error("Erro ao consultar historico: %s", exc)
             raise
         finally:
             cursor.close()
@@ -252,6 +276,7 @@ def listar_envios(
             }
         )
     return registros
+
 
 
 def listar_equipes_disponiveis() -> List[str]:

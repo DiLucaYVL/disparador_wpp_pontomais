@@ -13,13 +13,13 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>📊 Histórico de Envios</h1>
+            <h1>Histórico de Envios</h1>
             <p>Acompanhe todos os envios de mensagens realizados pelo sistema</p>
         </div>
 
         <!-- Counter Card -->
         <div class="card counter-card">
-            <h3>📈 Total Geral de Envios</h3>
+            <h3>Total Geral de Envios</h3>
             <div class="counter-number" id="totalCounter">0</div>
             <div class="counter-label">envios realizados</div>
             <div class="counter-breakdown">
@@ -37,37 +37,39 @@
         </div>
 
         <!-- Filters Card -->
-        <div class="card">
-            <h3>🔍 Filtros</h3>
+        <div class="card filters-card">
+            <h3>Filtros</h3>
             <div class="filters">
-                <div class="filter-group">
+                <div class="filter-group filter-group--wide">
                     <label>Equipe:</label>
-                    <div class="custom-dropdown">
-                        <div class="dropdown-header" id="equipeDropdownHeader">
-                            <span id="equipeSelectedText">Todas as equipes</span>
-                            <span class="dropdown-arrow">▼</span>
+                    <div class="checkbox-wrapper">
+                        <div class="checkbox-group" id="equipeCheckboxes" role="group" aria-label="Filtrar por equipe">
+                            <span class="checkbox-placeholder">Carregando equipes...</span>
                         </div>
-                        <div class="dropdown-content" id="equipeDropdownContent">
-                            <div class="dropdown-item selected" data-value="">Todas as equipes</div>
-                        </div>
-                        <input type="hidden" id="filtroEquipe" value="">
                     </div>
                 </div>
 
-                <div class="filter-group">
-                    <label>Tipo de Relatório:</label>
-                    <div class="custom-dropdown">
-                        <div class="dropdown-header" id="tipoDropdownHeader">
-                            <span id="tipoSelectedText">Todos os tipos</span>
-                            <span class="dropdown-arrow">▼</span>
+                <div class="filter-group filter-group--wide">
+                    <label>Tipo de Relatorio:</label>
+                    <div class="checkbox-wrapper">
+                        <div class="checkbox-group" id="tipoCheckboxes" role="group" aria-label="Filtrar por tipo de relatorio">
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="__all__" data-role="all" checked>
+                                Todos os tipos
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="filtroTipo" value="Auditoria">
+                                Auditoria
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="filtroTipo" value="Assinaturas">
+                                Assinaturas
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="filtroTipo" value="Ocorrencias">
+                                Ocorrencias
+                            </label>
                         </div>
-                        <div class="dropdown-content" id="tipoDropdownContent">
-                            <div class="dropdown-item selected" data-value="">Todos os tipos</div>
-                            <div class="dropdown-item" data-value="Auditoria">🔍 Auditoria</div>
-                            <div class="dropdown-item" data-value="Assinaturas">📝 Assinaturas</div>
-                            <div class="dropdown-item" data-value="Ocorrências">⚠️ Ocorrências</div>
-                        </div>
-                        <input type="hidden" id="filtroTipo" value="">
                     </div>
                 </div>
 
@@ -81,9 +83,12 @@
                     <input type="date" id="filtroFim" class="date-input">
                 </div>
 
-                <div class="filter-group" style="display: flex; align-items: end;">
-                    <button id="aplicarFiltros" class="filter-button">
-                        🔄 Aplicar Filtros
+                <div class="filter-group filter-actions">
+                    <button type="button" id="aplicarFiltros" class="filter-button">
+                        Aplicar Filtros
+                    </button>
+                    <button type="button" id="exportarExcel" class="filter-button export-button">
+                        Exportar Excel
                     </button>
                 </div>
             </div>
@@ -91,7 +96,7 @@
 
         <!-- Chart Card -->
         <div class="card">
-            <h3>📊 Envios por Equipe</h3>
+            <h3>Envios por Equipe</h3>
             <div class="chart-container">
                 <canvas id="graficoEquipes"></canvas>
             </div>
@@ -99,7 +104,7 @@
 
         <!-- Table Card -->
         <div class="card">
-            <h3>📋 Registros Detalhados</h3>
+            <h3>Registros Detalhados</h3>
             <div id="loadingIndicator" class="loading" style="display: none;">
                 <div class="loading-spinner"></div>
                 <p>Carregando dados...</p>
@@ -108,20 +113,16 @@
                 <table id="tabelaEnvios">
                     <thead>
                         <tr>
-                            <th>Data</th>
                             <th>Equipe</th>
-                            <th>Tipo</th>
-                            <th>Pessoa</th>
-                            <th>Motivo</th>
-                            <th>Status</th>
+                            <th>Quantidade</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
                 </table>
             </div>
         </div>
-    </div>
 
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/historico.js') }}"></script>
 </body>

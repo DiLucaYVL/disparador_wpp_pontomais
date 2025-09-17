@@ -3,95 +3,107 @@ let dados = [];
 let resumoAtual = { total: 0, sucessos: 0, erros: 0 };
 let equipesDisponiveis = [];
 
-// Configurar dropdowns
-function setupDropdowns() {
-  // Dropdown de Equipe
-  const equipeHeader = document.getElementById('equipeDropdownHeader');
-  const equipeContent = document.getElementById('equipeDropdownContent');
-  const equipeSelected = document.getElementById('equipeSelectedText');
-  const equipeInput = document.getElementById('filtroEquipe');
+const CHECKBOX_ALL_VALUE = '__all__';
 
-  equipeHeader.addEventListener('click', () => {
-    equipeHeader.classList.toggle('active');
-    equipeContent.classList.toggle('show');
-  });
+function handleCheckboxGroupChange(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') {
+    return;
+  }
 
-  equipeContent.addEventListener('click', (e) => {
-    if (e.target.classList.contains('dropdown-item')) {
-      document
-        .querySelectorAll('#equipeDropdownContent .dropdown-item')
-        .forEach((item) => {
-          item.classList.remove('selected');
-        });
-      e.target.classList.add('selected');
-      equipeSelected.textContent = e.target.textContent;
-      equipeInput.value = e.target.getAttribute('data-value');
-      equipeHeader.classList.remove('active');
-      equipeContent.classList.remove('show');
+  const container = target.closest('.checkbox-group');
+  if (!container) {
+    return;
+  }
+
+  const checkboxes = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+  const master = checkboxes.find((input) => input.dataset.role === 'all');
+
+  if (target.dataset.role === 'all') {
+    const shouldCheckAll = target.checked;
+    checkboxes.forEach((input) => {
+      if (input !== master) {
+        input.checked = false;
+      }
+    });
+    if (master) {
+      master.checked = shouldCheckAll;
     }
-  });
+    return;
+  }
 
-  // Dropdown de Tipo
-  const tipoHeader = document.getElementById('tipoDropdownHeader');
-  const tipoContent = document.getElementById('tipoDropdownContent');
-  const tipoSelected = document.getElementById('tipoSelectedText');
-  const tipoInput = document.getElementById('filtroTipo');
+  if (target.checked && master) {
+    master.checked = false;
+    return;
+  }
 
-  tipoHeader.addEventListener('click', () => {
-    tipoHeader.classList.toggle('active');
-    tipoContent.classList.toggle('show');
-  });
-
-  tipoContent.addEventListener('click', (e) => {
-    if (e.target.classList.contains('dropdown-item')) {
-      document
-        .querySelectorAll('#tipoDropdownContent .dropdown-item')
-        .forEach((item) => {
-          item.classList.remove('selected');
-        });
-      e.target.classList.add('selected');
-      tipoSelected.textContent = e.target.textContent;
-      tipoInput.value = e.target.getAttribute('data-value');
-      tipoHeader.classList.remove('active');
-      tipoContent.classList.remove('show');
+  if (master) {
+    const anyChecked = checkboxes.some((input) => input !== master && input.checked);
+    if (!anyChecked) {
+      master.checked = true;
     }
-  });
+  }
+}
 
-  // Fechar dropdowns ao clicar fora
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.custom-dropdown')) {
-      document.querySelectorAll('.dropdown-header').forEach((header) => {
-        header.classList.remove('active');
-      });
-      document.querySelectorAll('.dropdown-content').forEach((content) => {
-        content.classList.remove('show');
-      });
-    }
-  });
+function configurarCheckboxGrupo(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container || container.dataset.enhanced === 'true') {
+    return;
+  }
+
+  container.addEventListener('change', handleCheckboxGroupChange);
+  container.dataset.enhanced = 'true';
+}
+
+function obterSelecionados(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    return [];
+  }
+
+  return Array.from(container.querySelectorAll('input[type="checkbox"]:checked'))
+    .filter((input) => input.dataset.role !== 'all')
+    .map((input) => input.value);
+}
+
+function setupCheckboxFilters() {
+  configurarCheckboxGrupo('tipoCheckboxes');
+  configurarCheckboxGrupo('equipeCheckboxes');
 }
 
 // Carregar dados
 async function carregarDados() {
   const loadingIndicator = document.getElementById('loadingIndicator');
-  loadingIndicator.style.display = 'block';
+  if (loadingIndicator) {
+    loadingIndicator.style.display = 'block';
+  }
 
   const params = new URLSearchParams();
-  const equipe = document.getElementById('filtroEquipe').value;
-  const tipo = document.getElementById('filtroTipo').value;
-  const inicio = document.getElementById('filtroInicio').value;
-  const fim = document.getElementById('filtroFim').value;
+  const equipesSelecionadas = obterSelecionados('equipeCheckboxes');
+  const tiposSelecionados = obterSelecionados('tipoCheckboxes');
+  const inicio = document.getElementById('filtroInicio')?.value ?? '';
+  const fim = document.getElementById('filtroFim')?.value ?? '';
 
-  if (equipe) params.append('equipe', equipe);
-  if (tipo) params.append('tipo', tipo);
+  if (equipesSelecionadas.length) {
+    equipesSelecionadas.forEach((valor) => params.append('equipes', valor));
+  }
+
+  if (tiposSelecionados.length) {
+    tiposSelecionados.forEach((valor) => params.append('tipos', valor));
+  }
+
   if (inicio) params.append('inicio', inicio);
   if (fim) params.append('fim', fim);
 
+  const query = params.toString();
+
   try {
-    const resp = await fetch(`/historico/dados?${params.toString()}`);
+    const url = query ? `/historico/dados?${query}` : '/historico/dados';
+    const resp = await fetch(url);
     const data = await resp.json();
 
     if (!resp.ok || !data.success) {
-      throw new Error(data.error || 'Falha ao consultar histórico.');
+      throw new Error(data.error || 'Falha ao consultar histÃ³rico.');
     }
 
     dados = Array.isArray(data.dados) ? data.dados : [];
@@ -114,19 +126,49 @@ async function carregarDados() {
     atualizarContadores(resumoAtual);
     atualizarGraficoEquipes([]);
   } finally {
-    loadingIndicator.style.display = 'none';
+    if (loadingIndicator) {
+      loadingIndicator.style.display = 'none';
+    }
   }
 }
 
+
+function exportarHistorico() {
+  const params = new URLSearchParams();
+  const equipesSelecionadas = obterSelecionados('equipeCheckboxes');
+  const tiposSelecionados = obterSelecionados('tipoCheckboxes');
+  const inicio = document.getElementById('filtroInicio')?.value ?? '';
+  const fim = document.getElementById('filtroFim')?.value ?? '';
+
+  if (equipesSelecionadas.length) {
+    equipesSelecionadas.forEach((valor) => params.append('equipes', valor));
+  }
+
+  if (tiposSelecionados.length) {
+    tiposSelecionados.forEach((valor) => params.append('tipos', valor));
+  }
+
+  if (inicio) params.append('inicio', inicio);
+  if (fim) params.append('fim', fim);
+
+  const query = params.toString();
+  const url = query ? `/historico/exportar?${query}` : '/historico/exportar';
+  window.open(url, '_blank');
+}
+
+
+
 // Preencher tabela
-function preencherTabela(dados) {
+function preencherTabela(registros) {
   const tbody = document.querySelector('#tabelaEnvios tbody');
   tbody.innerHTML = '';
 
-  if (!dados.length) {
+  const matriz = agruparPorEquipeTipoMotivo(registros);
+
+  if (!matriz.length) {
     const linhaVazia = document.createElement('tr');
     const coluna = document.createElement('td');
-    coluna.colSpan = 6;
+    coluna.colSpan = 2;
     coluna.className = 'empty-row';
     coluna.textContent = 'Nenhum envio encontrado para os filtros selecionados.';
     linhaVazia.appendChild(coluna);
@@ -134,70 +176,206 @@ function preencherTabela(dados) {
     return;
   }
 
-  dados.forEach((row) => {
-    const tr = document.createElement('tr');
+  matriz.forEach((grupo, indice) => {
+    const rowId = `grupo-${indice}`;
+    const detailRowId = `detail-${rowId}`;
 
-    const dataTd = document.createElement('td');
-    dataTd.textContent = formatarData(row.data_envio);
-    tr.appendChild(dataTd);
+    const tr = document.createElement('tr');
+    tr.className = 'matrix-row';
+    tr.dataset.rowId = rowId;
 
     const equipeTd = document.createElement('td');
-    equipeTd.textContent = row.equipe || 'N/A';
+    equipeTd.className = 'matrix-cell matrix-cell-equipe';
+
+    const equipeWrapper = document.createElement('div');
+    equipeWrapper.className = 'matrix-cell-wrapper';
+
+    if (grupo.detalhes.length) {
+      const toggleButton = criarToggleButton(detailRowId);
+      toggleButton.title = 'Expandir detalhes por pessoa e motivo';
+      equipeWrapper.appendChild(toggleButton);
+    } else {
+      const placeholder = document.createElement('span');
+      placeholder.className = 'toggle-placeholder';
+      equipeWrapper.appendChild(placeholder);
+    }
+
+    const equipeTexto = document.createElement('span');
+    equipeTexto.className = 'matrix-text';
+    equipeTexto.textContent = grupo.equipe;
+    equipeWrapper.appendChild(equipeTexto);
+
+    equipeTd.appendChild(equipeWrapper);
     tr.appendChild(equipeTd);
 
-    const tipoTd = document.createElement('td');
-    tipoTd.textContent = row.tipo_relatorio || 'N/A';
-    tr.appendChild(tipoTd);
-
-    const pessoaTd = document.createElement('td');
-    pessoaTd.textContent = row.pessoa || 'N/A';
-    tr.appendChild(pessoaTd);
-
-    const motivoTd = document.createElement('td');
-    motivoTd.textContent = row.motivo_envio || 'N/A';
-    tr.appendChild(motivoTd);
-
-    const statusTd = document.createElement('td');
-    const statusBadge = document.createElement('span');
-    const statusNormalizado = (row.status || '').toLowerCase();
-    const statusClass = statusNormalizado === 'sucesso' ? 'status-success' : 'status-error';
-    const statusTexto = statusNormalizado === 'sucesso' ? 'sucesso' : (row.status || 'indefinido');
-    const statusIcon = statusNormalizado === 'sucesso' ? '✅' : '⚠️';
-    statusBadge.className = `status-badge ${statusClass}`;
-    statusBadge.textContent = `${statusIcon} ${statusTexto}`;
-    statusTd.appendChild(statusBadge);
-    tr.appendChild(statusTd);
+    const quantidadeTd = document.createElement('td');
+    quantidadeTd.className = 'matrix-cell matrix-cell-qty';
+    quantidadeTd.textContent = grupo.total.toLocaleString('pt-BR');
+    tr.appendChild(quantidadeTd);
 
     tbody.appendChild(tr);
+
+    if (grupo.detalhes.length) {
+      const detailRow = criarDrilldownRow(detailRowId, grupo);
+      tbody.appendChild(detailRow);
+    }
   });
 }
 
-function formatarData(dataTexto) {
-  if (!dataTexto) {
-    return 'N/A';
-  }
+function agruparPorEquipeTipoMotivo(registros) {
+  const grupos = new Map();
 
-  // Tenta interpretar ISO ou formato americano
-  const tentativaIso = new Date(dataTexto);
-  if (!Number.isNaN(tentativaIso.getTime())) {
-    return tentativaIso.toLocaleString('pt-BR', {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    });
-  }
+  registros.forEach((registro) => {
+    const equipe = normalizarCampo(registro.equipe);
+    const tipo = normalizarCampo(registro.tipo_relatorio || registro.tipo, 'Sem tipo');
+    const motivo = normalizarCampo(registro.motivo_envio || registro.motivo, 'Sem motivo');
+    const pessoa = normalizarCampo(registro.pessoa, 'Sem identificaÃ§Ã£o');
 
-  const partes = dataTexto.split(' ');
-  if (partes.length >= 2) {
-    const [dataParte, horaParte] = partes;
-    const [dia, mes, ano] = dataParte.split('/');
-    if (dia && mes && ano) {
-      return `${dia.padStart(2, '0')}/${mes.padStart(2, '0')}/${ano} ${horaParte || ''}`.trim();
+    if (!grupos.has(equipe)) {
+      grupos.set(equipe, {
+        equipe,
+        total: 0,
+        detalhes: new Map(),
+      });
     }
-  }
 
-  return dataTexto;
+    const grupo = grupos.get(equipe);
+    grupo.total += 1;
+
+    const chaveDetalhe = `${pessoa}|||${tipo}|||${motivo}`;
+    if (!grupo.detalhes.has(chaveDetalhe)) {
+      grupo.detalhes.set(chaveDetalhe, {
+        pessoa,
+        tipo,
+        motivo,
+        total: 0,
+      });
+    }
+    grupo.detalhes.get(chaveDetalhe).total += 1;
+  });
+
+  const lista = Array.from(grupos.values()).map((grupo) => ({
+    equipe: grupo.equipe,
+    total: grupo.total,
+    detalhes: Array.from(grupo.detalhes.values()).sort((a, b) => {
+      const ordemPessoa = a.pessoa.localeCompare(b.pessoa, 'pt-BR', { sensitivity: 'base' });
+      if (ordemPessoa !== 0) return ordemPessoa;
+      const ordemTipo = a.tipo.localeCompare(b.tipo, 'pt-BR', { sensitivity: 'base' });
+      if (ordemTipo !== 0) return ordemTipo;
+      return a.motivo.localeCompare(b.motivo, 'pt-BR', { sensitivity: 'base' });
+    }),
+  }));
+
+  lista.sort((a, b) =>
+    a.equipe.localeCompare(b.equipe, 'pt-BR', { sensitivity: 'base' })
+  );
+
+  return lista;
 }
 
+function normalizarCampo(valor, padrao = 'Nao informado') {
+  if (typeof valor === 'string') {
+    const texto = valor.trim();
+    return texto || padrao;
+  }
+
+  if (valor === undefined || valor === null) {
+    return padrao;
+  }
+
+  return String(valor);
+}
+
+function criarToggleButton(targetId) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'toggle-button';
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('aria-controls', targetId);
+
+  const icon = document.createElement('span');
+  icon.className = 'toggle-icon';
+  icon.textContent = '+';
+  button.appendChild(icon);
+
+  button.addEventListener('click', () => {
+    const detailRow = document.getElementById(targetId);
+    if (!detailRow) {
+      return;
+    }
+
+    const expanded = button.getAttribute('aria-expanded') === 'true';
+    button.setAttribute('aria-expanded', String(!expanded));
+    button.classList.toggle('expanded', !expanded);
+    icon.textContent = expanded ? '+' : '-';
+    detailRow.classList.toggle('hidden', expanded);
+  });
+
+  return button;
+}
+
+function criarDrilldownRow(detailRowId, grupo) {
+  const detailRow = document.createElement('tr');
+  detailRow.className = 'detail-row hidden';
+  detailRow.id = detailRowId;
+
+  const detailTd = document.createElement('td');
+  detailTd.colSpan = 2;
+
+  const card = document.createElement('div');
+  card.className = 'drilldown-card';
+
+  const header = document.createElement('div');
+  header.className = 'drilldown-header';
+  header.textContent = `Detalhes por pessoa e motivo (${grupo.total.toLocaleString('pt-BR')} envios)`;
+  card.appendChild(header);
+
+  const table = document.createElement('table');
+  table.className = 'drilldown-table';
+
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  const pessoaTh = document.createElement('th');
+  pessoaTh.textContent = 'Nome';
+  const tipoTh = document.createElement('th');
+  tipoTh.textContent = 'Tipo de Relatorio';
+  const motivoTh = document.createElement('th');
+  motivoTh.textContent = 'Motivo';
+  const qtdTh = document.createElement('th');
+  qtdTh.textContent = 'Quantidade';
+  headerRow.appendChild(pessoaTh);
+  headerRow.appendChild(tipoTh);
+  headerRow.appendChild(motivoTh);
+  headerRow.appendChild(qtdTh);
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const body = document.createElement('tbody');
+  grupo.detalhes.forEach((detalhe) => {
+    const linha = document.createElement('tr');
+    const nomeTd = document.createElement('td');
+    nomeTd.textContent = detalhe.pessoa;
+    const tipoTd = document.createElement('td');
+    tipoTd.textContent = detalhe.tipo;
+    const motivoTd = document.createElement('td');
+    motivoTd.textContent = detalhe.motivo;
+    const quantidadeTd = document.createElement('td');
+    quantidadeTd.className = 'drilldown-qty-cell';
+    quantidadeTd.textContent = detalhe.total.toLocaleString('pt-BR');
+    linha.appendChild(nomeTd);
+    linha.appendChild(tipoTd);
+    linha.appendChild(motivoTd);
+    linha.appendChild(quantidadeTd);
+    body.appendChild(linha);
+  });
+  table.appendChild(body);
+
+  card.appendChild(table);
+  detailTd.appendChild(card);
+  detailRow.appendChild(detailTd);
+
+  return detailRow;
+}
 // Atualizar contadores
 function atualizarContadores(resumo) {
   const total = resumo?.total ?? 0;
@@ -209,52 +387,71 @@ function atualizarContadores(resumo) {
   document.getElementById('errorTotal').textContent = erros;
 }
 
-// Atualizar dropdown de equipes
+// Atualizar filtro de equipes
 function atualizarEquipeSelect(equipes) {
-  const equipeContent = document.getElementById('equipeDropdownContent');
-  const selectedValue = document.getElementById('filtroEquipe').value;
-  let selectedLabel = 'Todas as equipes';
-  let selecionadoExiste = false;
+  const container = document.getElementById('equipeCheckboxes');
+  if (!container) {
+    return;
+  }
 
-  equipeContent.innerHTML = '';
+  const previouslySelected = new Set(
+    Array.from(container.querySelectorAll('input[type="checkbox"]:checked'))
+      .filter((input) => input.dataset.role !== 'all')
+      .map((input) => input.value)
+  );
+  const masterWasChecked = container.querySelector('input[data-role="all"]')?.checked ?? previouslySelected.size === 0;
 
-  const criarItem = (valor, texto) => {
-    const item = document.createElement('div');
-    item.className = 'dropdown-item';
-    item.dataset.value = valor;
-    item.textContent = texto;
-    if (valor === selectedValue) {
-      item.classList.add('selected');
-      selectedLabel = texto;
-      selecionadoExiste = true;
-    }
-    equipeContent.appendChild(item);
-  };
+  container.innerHTML = '';
 
-  criarItem('', 'Todas as equipes');
-  (equipes || []).forEach((equipe) => {
+  if (!equipes || !equipes.length) {
+    container.innerHTML = '<span class="checkbox-placeholder">Nenhuma equipe disponivel</span>';
+    configurarCheckboxGrupo('equipeCheckboxes');
+    return;
+  }
+
+  const masterLabel = document.createElement('label');
+  masterLabel.className = 'checkbox-item';
+  const masterInput = document.createElement('input');
+  masterInput.type = 'checkbox';
+  masterInput.value = CHECKBOX_ALL_VALUE;
+  masterInput.dataset.role = 'all';
+  masterInput.checked = masterWasChecked || previouslySelected.size === 0;
+  masterLabel.appendChild(masterInput);
+  masterLabel.appendChild(document.createTextNode('Todas as equipes'));
+  container.appendChild(masterLabel);
+
+  equipes.forEach((equipe) => {
     if (!equipe) {
       return;
     }
-    criarItem(equipe, equipe);
+    const label = document.createElement('label');
+    label.className = 'checkbox-item';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = equipe;
+    if (!masterInput.checked && previouslySelected.has(equipe)) {
+      input.checked = true;
+    }
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(equipe));
+    container.appendChild(label);
   });
 
-  if (!selecionadoExiste) {
-    document.getElementById('filtroEquipe').value = '';
-    selectedLabel = 'Todas as equipes';
-    equipeContent.firstChild.classList.add('selected');
+  if (!previouslySelected.size && !masterWasChecked) {
+    masterInput.checked = true;
   }
 
-  document.getElementById('equipeSelectedText').textContent = selectedLabel;
+  configurarCheckboxGrupo('equipeCheckboxes');
 }
 
-// Atualizar gráfico por equipes
+
+// Atualizar grafico por equipes
 function atualizarGraficoEquipes(dados) {
   const ctx = document.getElementById('graficoEquipes').getContext('2d');
 
   const equipeCounts = {};
   dados.forEach((item) => {
-    const equipeNome = item.equipe || 'Não informado';
+    const equipeNome = item.equipe || 'Nao informado';
     const status = (item.status || '').toLowerCase();
     if (!equipeCounts[equipeNome]) {
       equipeCounts[equipeNome] = { sucesso: 0, erro: 0 };
@@ -338,10 +535,20 @@ function atualizarGraficoEquipes(dados) {
 
 // Inicializar
 document.addEventListener('DOMContentLoaded', () => {
-  setupDropdowns();
-  document
-    .getElementById('aplicarFiltros')
-    .addEventListener('click', carregarDados);
+  setupCheckboxFilters();
+  const aplicar = document.getElementById('aplicarFiltros');
+  if (aplicar) {
+    aplicar.addEventListener('click', carregarDados);
+  }
+
+  const exportar = document.getElementById('exportarExcel');
+  if (exportar) {
+    exportar.addEventListener('click', exportarHistorico);
+  }
+
   carregarDados();
 });
+
+
+
 
