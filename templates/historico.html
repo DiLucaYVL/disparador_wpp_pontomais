@@ -42,33 +42,61 @@
             <div class="filters">
                 <div class="filter-group filter-group--wide">
                     <label>Equipe:</label>
-                    <div class="checkbox-wrapper">
-                        <div class="checkbox-group" id="equipeCheckboxes" role="group" aria-label="Filtrar por equipe">
-                            <span class="checkbox-placeholder">Carregando equipes...</span>
+                    <div class="custom-dropdown multiselect" id="equipeDropdown">
+                        <button type="button" class="dropdown-header">
+                            <span class="dropdown-label" id="equipeSelectedText">Todas as equipes</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="dropdown-content">
+                            <div class="checkbox-wrapper">
+                                <div class="checkbox-group"
+                                     id="equipeCheckboxes"
+                                     role="group"
+                                     aria-label="Filtrar por equipe"
+                                     data-label-target="equipeSelectedText"
+                                     data-default-label="Todas as equipes"
+                                     data-plural-label="selecionadas">
+                                    <span class="checkbox-placeholder">Carregando equipes...</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="filter-group filter-group--wide">
                     <label>Tipo de Relatorio:</label>
-                    <div class="checkbox-wrapper">
-                        <div class="checkbox-group" id="tipoCheckboxes" role="group" aria-label="Filtrar por tipo de relatorio">
-                            <label class="checkbox-item">
-                                <input type="checkbox" value="__all__" data-role="all" checked>
-                                Todos os tipos
-                            </label>
-                            <label class="checkbox-item">
-                                <input type="checkbox" name="filtroTipo" value="Auditoria">
-                                Auditoria
-                            </label>
-                            <label class="checkbox-item">
-                                <input type="checkbox" name="filtroTipo" value="Assinaturas">
-                                Assinaturas
-                            </label>
-                            <label class="checkbox-item">
-                                <input type="checkbox" name="filtroTipo" value="Ocorrencias">
-                                Ocorrencias
-                            </label>
+                    <div class="custom-dropdown multiselect" id="tipoDropdown">
+                        <button type="button" class="dropdown-header">
+                            <span class="dropdown-label" id="tipoSelectedText">Todos os tipos</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="dropdown-content">
+                            <div class="checkbox-wrapper">
+                                <div class="checkbox-group"
+                                     id="tipoCheckboxes"
+                                     role="group"
+                                     aria-label="Filtrar por tipo de relatorio"
+                                     data-label-target="tipoSelectedText"
+                                     data-default-label="Todos os tipos"
+                                     data-plural-label="selecionados">
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" value="__all__" data-role="all" checked>
+                                        Todos os tipos
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="filtroTipo" value="Auditoria">
+                                        Auditoria
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="filtroTipo" value="Assinaturas">
+                                        Assinaturas
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="filtroTipo" value="Ocorrencias">
+                                        Ocorrencias
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

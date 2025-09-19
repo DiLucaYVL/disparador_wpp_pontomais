@@ -336,7 +336,7 @@ def whatsapp_logout():
 
 @api_bp.route('/historico/dados', methods=['GET'])
 def historico_envios():
-    """Retorna o histórico de envios com filtros opcionais."""
+    """Retorna o historico de envios com filtros opcionais."""
     equipes_param = [valor.strip() for valor in request.args.getlist('equipes') if valor and valor.strip()]
     tipos_param = [valor.strip() for valor in request.args.getlist('tipos') if valor and valor.strip()]
 
@@ -372,7 +372,7 @@ def historico_envios():
 
 @api_bp.route('/historico/exportar', methods=['GET'])
 def exportar_historico():
-    """Gera um arquivo Excel com o histórico no formato hierárquico."""
+    """Gera um arquivo Excel com o historico no formato hierarquico."""
     equipes_param = [valor.strip() for valor in request.args.getlist('equipes') if valor and valor.strip()]
     tipos_param = [valor.strip() for valor in request.args.getlist('tipos') if valor and valor.strip()]
 

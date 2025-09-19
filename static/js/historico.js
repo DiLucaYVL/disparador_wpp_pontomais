@@ -5,6 +5,48 @@ let equipesDisponiveis = [];
 
 const CHECKBOX_ALL_VALUE = '__all__';
 
+function closeAllDropdowns(except) {
+  document.querySelectorAll('.custom-dropdown.multiselect.open').forEach((dropdown) => {
+    if (dropdown !== except) {
+      dropdown.classList.remove('open');
+      const header = dropdown.querySelector('.dropdown-header');
+      if (header) {
+        header.setAttribute('aria-expanded', 'false');
+      }
+    }
+  });
+}
+
+function setupMultiselectDropdown(dropdownId) {
+  const dropdown = document.getElementById(dropdownId);
+  if (!dropdown || dropdown.dataset.enhanced === 'true') {
+    return;
+  }
+
+  const header = dropdown.querySelector('.dropdown-header');
+  if (header) {
+    header.setAttribute('aria-expanded', 'false');
+    header.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const isOpen = dropdown.classList.contains('open');
+      closeAllDropdowns(dropdown);
+      if (isOpen) {
+        dropdown.classList.remove('open');
+        header.setAttribute('aria-expanded', 'false');
+      } else {
+        dropdown.classList.add('open');
+        header.setAttribute('aria-expanded', 'true');
+      }
+    });
+  }
+
+  dropdown.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
+
+  dropdown.dataset.enhanced = 'true';
+}
+
 function handleCheckboxGroupChange(event) {
   const target = event.target;
   if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') {
@@ -29,30 +71,69 @@ function handleCheckboxGroupChange(event) {
     if (master) {
       master.checked = shouldCheckAll;
     }
+    atualizarCheckboxLabel(container);
     return;
   }
 
   if (target.checked && master) {
     master.checked = false;
-    return;
-  }
-
-  if (master) {
+  } else if (master) {
     const anyChecked = checkboxes.some((input) => input !== master && input.checked);
     if (!anyChecked) {
       master.checked = true;
     }
   }
+
+  atualizarCheckboxLabel(container);
+}
+
+function atualizarCheckboxLabel(container) {
+  const labelId = container.dataset.labelTarget;
+  if (!labelId) {
+    return;
+  }
+  const label = document.getElementById(labelId);
+  if (!label) {
+    return;
+  }
+
+  const defaultLabel = container.dataset.defaultLabel || 'Selecionar';
+  const pluralLabel = container.dataset.pluralLabel || 'selecionadas';
+  const master = container.querySelector('input[data-role="all"]');
+  const selecionados = obterSelecionados(container.id);
+  const totalItens = master
+    ? container.querySelectorAll('input[type="checkbox"]').length - 1
+    : container.querySelectorAll('input[type="checkbox"]').length;
+
+  if ((master && master.checked) || !selecionados.length) {
+    label.textContent = defaultLabel;
+    return;
+  }
+
+  if (totalItens > 0 && selecionados.length === totalItens) {
+    label.textContent = defaultLabel;
+    return;
+  }
+
+  if (selecionados.length <= 2) {
+    label.textContent = selecionados.join(', ');
+  } else {
+    label.textContent = `${selecionados.length} ${pluralLabel}`;
+  }
 }
 
 function configurarCheckboxGrupo(containerId) {
   const container = document.getElementById(containerId);
-  if (!container || container.dataset.enhanced === 'true') {
+  if (!container) {
     return;
   }
 
-  container.addEventListener('change', handleCheckboxGroupChange);
-  container.dataset.enhanced = 'true';
+  if (container.dataset.enhanced !== 'true') {
+    container.addEventListener('change', handleCheckboxGroupChange);
+    container.dataset.enhanced = 'true';
+  }
+
+  atualizarCheckboxLabel(container);
 }
 
 function obterSelecionados(containerId) {
@@ -69,10 +150,31 @@ function obterSelecionados(containerId) {
 function setupCheckboxFilters() {
   configurarCheckboxGrupo('tipoCheckboxes');
   configurarCheckboxGrupo('equipeCheckboxes');
+  setupMultiselectDropdown('tipoDropdown');
+  setupMultiselectDropdown('equipeDropdown');
+
+  const tipoContainer = document.getElementById('tipoCheckboxes');
+  if (tipoContainer) {
+    atualizarCheckboxLabel(tipoContainer);
+  }
+  const equipeContainer = document.getElementById('equipeCheckboxes');
+  if (equipeContainer) {
+    atualizarCheckboxLabel(equipeContainer);
+  }
 }
 
-// Carregar dados
+document.addEventListener('click', () => {
+  closeAllDropdowns();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closeAllDropdowns();
+  }
+});
+
 async function carregarDados() {
+  closeAllDropdowns();
   const loadingIndicator = document.getElementById('loadingIndicator');
   if (loadingIndicator) {
     loadingIndicator.style.display = 'block';
@@ -103,7 +205,7 @@ async function carregarDados() {
     const data = await resp.json();
 
     if (!resp.ok || !data.success) {
-      throw new Error(data.error || 'Falha ao consultar histÃ³rico.');
+      throw new Error(data.error || 'Falha ao consultar historico.');
     }
 
     dados = Array.isArray(data.dados) ? data.dados : [];
@@ -132,8 +234,8 @@ async function carregarDados() {
   }
 }
 
-
 function exportarHistorico() {
+  closeAllDropdowns();
   const params = new URLSearchParams();
   const equipesSelecionadas = obterSelecionados('equipeCheckboxes');
   const tiposSelecionados = obterSelecionados('tipoCheckboxes');
@@ -155,8 +257,6 @@ function exportarHistorico() {
   const url = query ? `/historico/exportar?${query}` : '/historico/exportar';
   window.open(url, '_blank');
 }
-
-
 
 // Preencher tabela
 function preencherTabela(registros) {
@@ -393,6 +493,8 @@ function atualizarEquipeSelect(equipes) {
   if (!container) {
     return;
   }
+
+  closeAllDropdowns();
 
   const previouslySelected = new Set(
     Array.from(container.querySelectorAll('input[type="checkbox"]:checked'))
