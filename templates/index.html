@@ -89,6 +89,7 @@
                         </label>
                     </div>
                     <div id="fileName" class="file-name"></div>
+                    <div id="relatorioStatus" class="report-alert hidden"></div>
                 </div>
 
                 <!-- Settings Card -->
@@ -233,7 +234,19 @@
     </div>
 
 
-    <!-- Scripts -->
+    <div id="modalOverlay" class="modal-overlay hidden"></div>
+    <div id="confirmReenvioModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmReenvioTitulo">
+        <div class="modal-content">
+            <h4 id="confirmReenvioTitulo">Confirmar reenvio</h4>
+            <p>Esse relatorio ja foi enviado anteriormente. Se voce refizer o envio, podera enviar mensagens que ja foram enviadas antes.</p>
+            <div class="modal-actions">
+                <button type="button" id="confirmReenvioCancelar" class="modal-button modal-button--secondary">Cancelar</button>
+                <button type="button" id="confirmReenvioConfirmar" class="modal-button modal-button--primary">Reenviar mesmo assim</button>
+            </div>
+        </div>
+    </div>
+
+<!-- Scripts -->
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/api.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/ui.js') }}"></script>

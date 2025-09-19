@@ -10,9 +10,16 @@ _executor = ThreadPoolExecutor(max_workers=4)
 _tasks = {}
 
 
-def enqueue_csv_processing(filepath: str, ignorar_sabados: bool, tipo_relatorio: str,
+def enqueue_csv_processing(
+    filepath: str,
+    ignorar_sabados: bool,
+    tipo_relatorio: str,
     equipes_selecionadas: Optional[set] = None,
-    debug_mode: bool = False) -> str:
+    debug_mode: bool = False,
+    nome_relatorio: Optional[str] = None,
+    nome_relatorio_original: Optional[str] = None,
+    equipes_permitidas: Optional[set] = None,
+) -> str:
     """Agenda o processamento do CSV em background."""
     task_id = uuid.uuid4().hex
     _tasks[task_id] = {"status": "queued", "result": None, "error": None}
@@ -21,7 +28,13 @@ def enqueue_csv_processing(filepath: str, ignorar_sabados: bool, tipo_relatorio:
         _tasks[task_id]["status"] = "running"
         try:
             logs, stats, nome_arquivo_log = processar_csv(
-                filepath, ignorar_sabados, tipo_relatorio, equipes_selecionadas
+                filepath,
+                ignorar_sabados,
+                tipo_relatorio,
+                equipes_selecionadas,
+                nome_relatorio=nome_relatorio,
+                nome_relatorio_original=nome_relatorio_original,
+                equipes_permitidas=equipes_permitidas,
             )
 
             debug_data = None

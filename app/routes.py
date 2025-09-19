@@ -16,7 +16,14 @@ from app.config.settings import (
     EVOLUTION_TOKEN,
     EVOLUTION_URL,
 )
-from app.history import listar_envios, listar_equipes_disponiveis
+from app.history import (
+    listar_envios,
+    listar_equipes_disponiveis,
+    normalizar_nome_relatorio,
+    obter_status_relatorio,
+    STATUS_SUCESSO_TOTAL,
+    STATUS_ENVIO_PARCIAL,
+)
 from app.history_export import gerar_planilha_historico
 
 api_bp = Blueprint('api', __name__)
@@ -177,27 +184,81 @@ def enviar():
         if tipo_relatorio not in {"Auditoria", "Ocorrências", "Assinaturas"}:
             return jsonify({
                 "success": False,
-                "log": [{"type": "error", "message": f"❌ Tipo de relatório inválido: {tipo_relatorio}. Selecione 'Auditoria', 'Ocorrências' ou 'Assinaturas'."}]
+                "log": [{"type": "error", "message": f"⚠️ Tipo de relatório inválido: {tipo_relatorio}. Selecione 'Auditoria', 'Ocorrências' ou 'Assinaturas'."}]
             }), 400
 
         debug_mode = request.form.get('debugMode', 'false') == 'true'
+        forcar_reenvio = request.form.get('forcarReenvio', 'false').lower() == 'true'
 
         if not file:
-            return jsonify({"success": False, "log": ["❌ Nenhum arquivo CSV enviado."]}), 400
+            return jsonify({"success": False, "log": ["⚠️ Nenhum arquivo CSV enviado."]}), 400
 
         if not file.filename.lower().endswith('csv'):
-            return jsonify({"success": False, "log": ["❌ Formato inválido. Envie um arquivo .csv"]}), 400
+            return jsonify({"success": False, "log": ["⚠️ Formato inválido. Envie um arquivo .csv"]}), 400
+
+        nome_relatorio_original = (file.filename or '').strip()
+        nome_relatorio_normalizado = normalizar_nome_relatorio(nome_relatorio_original)
+        if not nome_relatorio_normalizado:
+            return jsonify({
+                "success": False,
+                "log": [{"type": "error", "message": "⚠️ Não foi possível identificar o nome do relatório enviado."}]
+            }), 400
+
+        status_relatorio = obter_status_relatorio(nome_relatorio_original)
+        equipes_permitidas = None
+        if status_relatorio:
+            status_atual = (status_relatorio.get('status') or '').strip()
+            if status_atual == STATUS_SUCESSO_TOTAL and not forcar_reenvio:
+                return jsonify({
+                    "success": False,
+                    "code": "relatorio_concluido",
+                    "message": "Esse relatório já foi enviado anteriormente. Se você refizer o envio, poderá enviar mensagens que já foram enviadas antes."
+                }), 409
+            if status_atual == STATUS_ENVIO_PARCIAL:
+                pendencias = status_relatorio.get('pendencias') or []
+                equipes_permitidas = {str(item).strip() for item in pendencias if str(item).strip()}
+                if not equipes_permitidas:
+                    return jsonify({
+                        "success": False,
+                        "code": "relatorio_sem_pendencias",
+                        "message": "Não há pendências para esse relatório. Todas as mensagens já foram registradas."
+                    }), 409
 
         filename = secure_filename(file.filename)
         filename = f"{uuid.uuid4().hex[:8]}_{filename}"
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         file.save(filepath)
 
-        equipes_selecionadas = request.form.get('equipesSelecionadas')
-        equipes_selecionadas = set(json.loads(equipes_selecionadas)) if equipes_selecionadas else None
+        equipes_selecionadas_raw = request.form.get('equipesSelecionadas')
+        equipes_selecionadas = None
+        if equipes_selecionadas_raw:
+            try:
+                selecionadas_lista = json.loads(equipes_selecionadas_raw)
+            except json.JSONDecodeError:
+                return jsonify({
+                    "success": False,
+                    "log": [{"type": "error", "message": "⚠️ Erro ao interpretar as equipes selecionadas."}]
+                }), 400
+            equipes_filtradas = {str(item).strip() for item in selecionadas_lista if str(item).strip()}
+            equipes_selecionadas = equipes_filtradas or None
+
+        if equipes_permitidas:
+            if equipes_selecionadas:
+                equipes_selecionadas = {
+                    equipe for equipe in equipes_selecionadas if equipe in equipes_permitidas
+                } or None
+            if not equipes_selecionadas:
+                equipes_selecionadas = set(equipes_permitidas)
 
         task_id = enqueue_csv_processing(
-            filepath, ignorar_sabados, tipo_relatorio, equipes_selecionadas, debug_mode
+            filepath,
+            ignorar_sabados,
+            tipo_relatorio,
+            equipes_selecionadas,
+            debug_mode,
+            nome_relatorio=nome_relatorio_normalizado,
+            nome_relatorio_original=nome_relatorio_original,
+            equipes_permitidas=equipes_permitidas,
         )
 
         return jsonify({
@@ -210,8 +271,25 @@ def enviar():
         logging.exception("Erro ao agendar processamento.")
         return jsonify({
             "success": False,
-            "log": [{"type": "error", "message": "❌ Erro ao agendar processamento."}]
+            "log": [{"type": "error", "message": "⚠️ Erro ao agendar processamento."}]
         }), 500
+
+
+@api_bp.route('/relatorios/status', methods=['GET'])
+def consultar_status_relatorio():
+    nome_relatorio = (request.args.get('nome') or '').strip()
+    if not nome_relatorio:
+        return jsonify({"success": False, "error": "Nome do relatório não informado."}), 400
+
+    status_relatorio = obter_status_relatorio(nome_relatorio)
+    if not status_relatorio:
+        return jsonify({"success": True, "status": "novo", "relatorio": None})
+
+    return jsonify({
+        "success": True,
+        "status": status_relatorio.get('status') or "novo",
+        "relatorio": status_relatorio,
+    })
 
 
 @api_bp.route('/status/<task_id>', methods=['GET'])

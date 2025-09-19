@@ -374,3 +374,128 @@
     cursor: not-allowed;
 }
 
+
+/* Report status alert */
+.report-alert {
+    margin-top: 16px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    border-left: 4px solid;
+    background: #f5f7fa;
+    color: #2c3e50;
+    line-height: 1.4;
+    font-size: 0.95rem;
+}
+
+.report-alert--warning {
+    background: #fff7e6;
+    border-color: #f5a623;
+    color: #7a4a00;
+}
+
+.report-alert--info {
+    background: #e9f1ff;
+    border-color: #4c6ef5;
+    color: #1b3d8f;
+}
+
+.report-alert ul {
+    margin: 12px 0 0;
+    padding-left: 20px;
+}
+
+.report-alert li {
+    margin-bottom: 4px;
+}
+
+.report-alert__action {
+    margin-top: 12px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    background: #4c6ef5;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.report-alert__action:hover {
+    background: #3b5bdb;
+}
+
+/* Modal confirmation */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    z-index: 900;
+}
+
+.modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 901;
+}
+
+.modal.hidden,
+.modal-overlay.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 24px 28px;
+    width: min(420px, calc(100% - 32px));
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
+}
+
+.modal-content h4 {
+    margin: 0 0 12px;
+    font-size: 1.2rem;
+    color: #1e293b;
+}
+
+.modal-content p {
+    margin: 0;
+    color: #475569;
+}
+
+.modal-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.modal-button {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.modal-button--secondary {
+    background: #e2e8f0;
+    color: #1e293b;
+}
+
+.modal-button--secondary:hover {
+    background: #cbd5f5;
+}
+
+.modal-button--primary {
+    background: #4c6ef5;
+    color: #ffffff;
+}
+
+.modal-button--primary:hover {
+    background: #3b5bdb;
+}
