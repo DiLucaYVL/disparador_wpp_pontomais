@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TopFama | Histórico de Envios</title>
+    <link rel="icon" href="https://lojastopfama.com.br/sobre/topfama_icon.png" type="image/png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/historico.css') }}">
+</head>
+<body>
+    <a href="/" class="back-button">← Voltar ao Início</a>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Histórico de Envios</h1>
+            <p>Acompanhe todos os envios de mensagens realizados pelo sistema</p>
+        </div>
+
+        <!-- Counter Card -->
+        <div class="card counter-card">
+            <h3>Total Geral de Envios</h3>
+            <div class="counter-number" id="totalCounter">0</div>
+            <div class="counter-label">envios realizados</div>
+            <div class="counter-breakdown">
+                <div class="breakdown-item">
+                    <span class="success">✅</span>
+                    <span id="successTotal">0</span>
+                    <span>sucessos</span>
+                </div>
+                <div class="breakdown-item">
+                    <span class="error">❌</span>
+                    <span id="errorTotal">0</span>
+                    <span>falhas</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters Card -->
+        <div class="card filters-card">
+            <h3>Filtros</h3>
+            <div class="filters">
+                <div class="filter-group filter-group--wide">
+                    <label>Equipe:</label>
+                    <div class="custom-dropdown multiselect" id="equipeDropdown">
+                        <button type="button" class="dropdown-header">
+                            <span class="dropdown-label" id="equipeSelectedText">Todas as equipes</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="dropdown-content">
+                            <div class="checkbox-wrapper">
+                                <div class="checkbox-group"
+                                     id="equipeCheckboxes"
+                                     role="group"
+                                     aria-label="Filtrar por equipe"
+                                     data-label-target="equipeSelectedText"
+                                     data-default-label="Todas as equipes"
+                                     data-plural-label="selecionadas">
+                                    <span class="checkbox-placeholder">Carregando equipes...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filter-group filter-group--wide">
+                    <label>Tipo de Relatorio:</label>
+                    <div class="custom-dropdown multiselect" id="tipoDropdown">
+                        <button type="button" class="dropdown-header">
+                            <span class="dropdown-label" id="tipoSelectedText">Todos os tipos</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="dropdown-content">
+                            <div class="checkbox-wrapper">
+                                <div class="checkbox-group"
+                                     id="tipoCheckboxes"
+                                     role="group"
+                                     aria-label="Filtrar por tipo de relatorio"
+                                     data-label-target="tipoSelectedText"
+                                     data-default-label="Todos os tipos"
+                                     data-plural-label="selecionados">
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" value="__all__" data-role="all" checked>
+                                        Todos os tipos
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="filtroTipo" value="Auditoria">
+                                        Auditoria
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="filtroTipo" value="Assinaturas">
+                                        Assinaturas
+                                    </label>
+                                    <label class="checkbox-item">
+                                        <input type="checkbox" name="filtroTipo" value="Ocorrencias">
+                                        Ocorrencias
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Data Inicial:</label>
+                    <input type="date" id="filtroInicio" class="date-input">
+                </div>
+
+                <div class="filter-group">
+                    <label>Data Final:</label>
+                    <input type="date" id="filtroFim" class="date-input">
+                </div>
+
+                <div class="filter-group filter-actions">
+                    <button type="button" id="aplicarFiltros" class="filter-button">
+                        Aplicar Filtros
+                    </button>
+                    <button type="button" id="exportarExcel" class="filter-button export-button">
+                        Exportar Excel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Card -->
+        <div class="card">
+            <h3>Envios por Equipe</h3>
+            <div class="chart-container">
+                <canvas id="graficoEquipes"></canvas>
+            </div>
+        </div>
+
+        <!-- Table Card -->
+        <div class="card">
+            <h3>Registros Detalhados</h3>
+            <div id="loadingIndicator" class="loading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>Carregando dados...</p>
+            </div>
+            <div class="table-container">
+                <table id="tabelaEnvios">
+                    <thead>
+                        <tr>
+                            <th>Equipe</th>
+                            <th>Quantidade</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/historico.js') }}"></script>
+</body>
+</html>

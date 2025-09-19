@@ -79,6 +79,17 @@ export async function obterStatus(taskId) {
     return await res.json();
 }
 
+export async function consultarStatusRelatorio(nomeArquivo) {
+    const url = new URL(`${API_BASE_URL}/relatorios/status`);
+    url.searchParams.set('nome', nomeArquivo);
+    const res = await fetch(url.toString());
+    const erroHTTP = await processarRespostaHTTP(res);
+    if (erroHTTP) {
+        throw new Error(erroHTTP);
+    }
+    return await res.json();
+}
+
 /**
  * Obtém lista de equipes do CSV enviado
  * @param {FormData} formData - Dados do formulário incluindo arquivo CSV

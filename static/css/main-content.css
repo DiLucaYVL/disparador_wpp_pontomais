@@ -52,3 +52,8 @@
     font-size: 1.5em;
 }
 
+/* ===== GRÁFICOS ===== */
+.grafico-container {
+    height: 300px;
+}
+

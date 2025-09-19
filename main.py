@@ -13,5 +13,11 @@ app.register_blueprint(api_bp)
 def index():
     return render_template('index.html')
 
+
+@app.route('/historico')
+def historico():
+    """Página que exibe o histórico de envios."""
+    return render_template('historico.html')
+
 if __name__ == '__main__':    
     app.run(use_reloader=False, host="0.0.0.0", port=8000)
