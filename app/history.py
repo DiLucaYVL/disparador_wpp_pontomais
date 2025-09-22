@@ -226,10 +226,10 @@ tipo_relatorio: str,
         return
 
     nome_original_valor = (nome_original or nome_relatorio or nome_chave).strip()
-    status_final = STATUS_SUCESSO_TOTAL if int(erro or 0) <= 0 else STATUS_ENVIO_PARCIAL
     total_int = int(total or 0)
     sucesso_int = int(sucesso or 0)
     erro_int = int(erro or 0)
+    status_final = STATUS_SUCESSO_TOTAL if erro_int <= 0 and sucesso_int >= total_int else STATUS_ENVIO_PARCIAL
     equipes_falhas = []
     if equipes_com_erro:
         equipes_falhas = sorted({str(equipe).strip() for equipe in equipes_com_erro if str(equipe).strip()})

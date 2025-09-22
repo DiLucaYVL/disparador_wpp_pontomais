@@ -54,13 +54,32 @@ def processar_csv(
     nome_relatorio_chave = normalizar_nome_relatorio(nome_relatorio or nome_relatorio_original)
     nome_relatorio_exibicao = (nome_relatorio_original or nome_relatorio or nome_relatorio_chave or "relatorio_sem_nome").strip()
 
+    def normalizar_equipe_valor(valor: object) -> str:
+        texto = str(valor).strip().upper()
+        if texto in {"", "NAN", "NONE", "NULL"}:
+            return ""
+        return texto
+
     equipes_selecionadas_norm = None
     if equipes_selecionadas:
-        equipes_selecionadas_norm = {str(eq).strip().upper() for eq in equipes_selecionadas if str(eq).strip()}
+        equipes_selecionadas_norm = {
+            valor
+            for valor in (normalizar_equipe_valor(eq) for eq in equipes_selecionadas)
+            if valor
+        }
 
     equipes_permitidas_norm = None
     if equipes_permitidas:
-        equipes_permitidas_norm = {str(eq).strip().upper() for eq in equipes_permitidas if str(eq).strip()}
+        equipes_permitidas_norm = {
+            valor
+            for valor in (normalizar_equipe_valor(eq) for eq in equipes_permitidas)
+            if valor
+        }
+
+    equipes_previstas_norm = set(equipes_permitidas_norm or [])
+    equipes_sucesso_norm = set()
+
+
 
     def equipe_autorizada(equipe_normalizada: str) -> bool:
         if equipes_permitidas_norm and equipe_normalizada not in equipes_permitidas_norm:
@@ -72,6 +91,12 @@ def processar_csv(
     equipes_com_erro = set()
     if tipo_relatorio == "Assinaturas":
         mensagens_por_equipe = gerar_mensagens_assinaturas(df)
+        if not equipes_previstas_norm:
+            equipes_previstas_norm = {
+                valor
+                for valor in (normalizar_equipe_valor(equipe) for equipe in mensagens_por_equipe.keys())
+                if valor
+            }
         futures = {}
         historico_por_equipe = defaultdict(list)
         with ThreadPoolExecutor(max_workers=5) as executor:
@@ -118,6 +143,9 @@ def processar_csv(
                 future.result()
                 logs.append({"type": "success", "message": f" Mensagem enviada para {titulo}"})
                 stats["sucesso"] += 1
+                equipe_sucesso = normalizar_equipe_valor(equipe_nome)
+                if equipe_sucesso:
+                    equipes_sucesso_norm.add(equipe_sucesso)
                 if registros:
                     envios_lote = [
                         {
@@ -175,6 +203,13 @@ def processar_csv(
                 motivo_texto = "; ".join(motivos_unicos) or "Motivo não informado"
                 historico_por_equipe[equipe].append((nome_formatado, motivo_texto))
 
+        if not equipes_previstas_norm:
+            equipes_previstas_norm = {
+                valor
+                for valor in (normalizar_equipe_valor(equipe) for equipe in mensagens_por_equipe_data.keys())
+                if valor
+            }
+
         futures = {}
         with ThreadPoolExecutor(max_workers=5) as executor:
             for equipe, datas in sorted(mensagens_por_equipe_data.items()):
@@ -221,7 +256,7 @@ def processar_csv(
                 )
                 futures[future] = (titulo, equipe)
                 stats["total"] += 1
-                stats["equipes"].add(equipe)
+                stats["equipes"].add(equipe_normalizada)
 
         for future in as_completed(futures):
             titulo, equipe_nome = futures[future]
@@ -230,6 +265,9 @@ def processar_csv(
                 future.result()
                 logs.append({"type": "success", "message": f" Mensagem enviada para {titulo}"})
                 stats["sucesso"] += 1
+                equipe_sucesso = normalizar_equipe_valor(equipe_nome)
+                if equipe_sucesso:
+                    equipes_sucesso_norm.add(equipe_sucesso)
                 if registros:
                     envios_lote = [
                         {
@@ -261,10 +299,35 @@ def processar_csv(
                     ]
                     registrar_envio(envios_lote)
 
+    if not equipes_previstas_norm and isinstance(stats["equipes"], set):
+        equipes_previstas_norm = {
+            valor
+            for valor in (normalizar_equipe_valor(eq) for eq in stats["equipes"])
+            if valor
+        }
+
+    equipes_previstas_norm = {eq for eq in equipes_previstas_norm if eq}
+
+    pendencias_nao_processadas = sorted(
+        equipe
+        for equipe in equipes_previstas_norm
+        if equipe not in equipes_sucesso_norm and equipe not in equipes_com_erro
+    )
+    if pendencias_nao_processadas:
+        for equipe in pendencias_nao_processadas:
+            logs.append({
+                "type": "warning",
+                "message": f" Envio pendente para {equipe}. Nenhuma mensagem foi enviada para esta equipe nesta execucao."
+            })
+        equipes_com_erro.update(pendencias_nao_processadas)
+        stats["erro"] += len(pendencias_nao_processadas)
+
     if equipes_sem_numero:
         logs.append({"type": "warning", "message": f" Números não encontrados para: {', '.join(equipes_sem_numero)}"})
 
-    stats["equipes"] = len(stats["equipes"])
+    total_equipes_previstas = len(equipes_previstas_norm)
+    stats["total"] = max(stats["sucesso"] + stats["erro"], total_equipes_previstas)
+    stats["equipes"] = total_equipes_previstas
     stats["pendencias"] = len(equipes_com_erro)
 
     if nome_relatorio_chave:

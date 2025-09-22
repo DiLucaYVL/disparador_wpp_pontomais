@@ -30,10 +30,8 @@ api_bp = Blueprint('api', __name__)
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-
 def _evo_headers():
     return {"Content-Type": "application/json", "apikey": EVOLUTION_TOKEN}
-
 
 def verificar_sessao() -> bool:
     """Garante que a sessão do WhatsApp esteja ativa.
@@ -101,7 +99,6 @@ def verificar_sessao() -> bool:
         logging.error("Erro ao conectar instância: %s", exc)
         return False
 
-
 def enviar_whatsapp(numero, mensagem, equipe=None):
     if not verificar_sessao():
         logging.error("Sessão do WhatsApp desconectada")
@@ -165,7 +162,6 @@ def enviar_whatsapp(numero, mensagem, equipe=None):
     except BaseException as be:  # noqa: BLE001
         logging.error("🚨 BASEEXCEPTION CAPTURADA: %s", type(be).__name__)
         raise
-
 
 @api_bp.route('/config', methods=['GET'])
 def get_config():
@@ -274,7 +270,6 @@ def enviar():
             "log": [{"type": "error", "message": "⚠️ Erro ao agendar processamento."}]
         }), 500
 
-
 @api_bp.route('/relatorios/status', methods=['GET'])
 def consultar_status_relatorio():
     nome_relatorio = (request.args.get('nome') or '').strip()
@@ -291,37 +286,44 @@ def consultar_status_relatorio():
         "relatorio": status_relatorio,
     })
 
-
 @api_bp.route('/status/<task_id>', methods=['GET'])
 def status(task_id):
     """Retorna o andamento e o resultado de uma tarefa agendada."""
     from app.tasks import get_task_status
-
     task = get_task_status(task_id)
     if not task:
-        return jsonify({"success": False, "error": "Tarefa não encontrada"}), 404
-
-    if task["status"] == "done":
-        result = task["result"]
+        return jsonify({
+            "success": True,
+            "status": "pending",
+            "message": "Status da tarefa ainda não está disponível. Tente novamente em instantes."
+        }), 202
+    status_atual = (task.get("status") or "").strip() or "pending"
+    if status_atual == "done":
+        result = task.get("result") or {}
         return jsonify({
             "success": True,
             "status": "done",
-            "log": result["logs"],
-            "stats": result["stats"],
+            "log": result.get("logs", []),
+            "stats": result.get("stats", {}),
             "debug": result.get("debug"),
             "nome_arquivo_log": result.get("nome_arquivo_log"),
+            "created_at": task.get("created_at"),
+            "updated_at": task.get("updated_at"),
         })
-
-    if task["status"] == "error":
+    if status_atual == "error":
         return jsonify({
             "success": False,
             "status": "error",
-            "error": task["error"],
+            "error": task.get("error", "Erro desconhecido."),
+            "created_at": task.get("created_at"),
+            "updated_at": task.get("updated_at"),
         })
-
-    return jsonify({"success": True, "status": task["status"]})
-
-
+    return jsonify({
+        "success": True,
+        "status": status_atual,
+        "created_at": task.get("created_at"),
+        "updated_at": task.get("updated_at"),
+    })
 @api_bp.route('/equipes', methods=['POST'])
 def obter_equipes():
     file = request.files.get('csvFile')
@@ -364,7 +366,6 @@ def well_known(subpath):
     # Não serve nada; só evita poluir o log com 404
     return ("", 204)
 
-
 @api_bp.route('/whatsapp/status', methods=['GET'])
 def whatsapp_status():
     try:
@@ -375,7 +376,6 @@ def whatsapp_status():
         logging.exception("Erro ao obter status do WhatsApp")
         return jsonify({"error": str(exc)}), 500
 
-
 @api_bp.route('/whatsapp/qr', methods=['GET'])
 def whatsapp_qr():
     try:
@@ -385,7 +385,6 @@ def whatsapp_qr():
     except Exception as exc:  # noqa: BLE001
         logging.exception("Erro ao obter QR Code do WhatsApp")
         return jsonify({"error": str(exc)}), 500
-
 
 @api_bp.route('/whatsapp/instance', methods=['GET'])
 def whatsapp_instance():
@@ -400,7 +399,6 @@ def whatsapp_instance():
         logging.exception("Erro ao obter dados da instância")
         return jsonify({"error": str(exc)}), 500
 
-
 @api_bp.route('/whatsapp/logout', methods=['DELETE'])
 def whatsapp_logout():
     try:
@@ -410,7 +408,6 @@ def whatsapp_logout():
     except Exception as exc:  # noqa: BLE001
         logging.exception("Erro ao desconectar WhatsApp")
         return jsonify({"error": str(exc)}), 500
-
 
 @api_bp.route('/historico/dados', methods=['GET'])
 def historico_envios():
@@ -446,7 +443,6 @@ def historico_envios():
         "resumo": resumo,
         "equipes": equipes_disponiveis,
     })
-
 
 @api_bp.route('/historico/exportar', methods=['GET'])
 def exportar_historico():
