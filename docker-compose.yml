@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: disparador-wpp
+    env_file:
+      - .env
+    ports:
+      - "192.168.99.50:8000:8000"
+    volumes:
+      - uploads_data:/app/uploads
+      - logs_data:/app/log
+      - task_status_data:/app/task_status
+      - secrets_data:/app/secrets
+    restart: unless-stopped
+
+volumes:
+  uploads_data:
+  logs_data:
+  task_status_data:
+  secrets_data:

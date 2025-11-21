@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.whatsapp.numeros_equipes import carregar_numeros_equipes
 from app.processamento.log import configurar_log
 from app.processamento.mapear_gerencia import eh_loja
+from app.services.google_sheets import registrar_dataframe_no_sheets
 from collections import defaultdict
 from datetime import datetime
 import logging
@@ -77,9 +78,8 @@ def processar_csv(
         }
 
     equipes_previstas_norm = set(equipes_permitidas_norm or [])
+    equipes_processadas_norm = set()
     equipes_sucesso_norm = set()
-
-
 
     def equipe_autorizada(equipe_normalizada: str) -> bool:
         if equipes_permitidas_norm and equipe_normalizada not in equipes_permitidas_norm:
@@ -257,6 +257,7 @@ def processar_csv(
                 futures[future] = (titulo, equipe)
                 stats["total"] += 1
                 stats["equipes"].add(equipe_normalizada)
+                equipes_processadas_norm.add(equipe_normalizada)
 
         for future in as_completed(futures):
             titulo, equipe_nome = futures[future]
@@ -299,7 +300,35 @@ def processar_csv(
                     ]
                     registrar_envio(envios_lote)
 
-    if not equipes_previstas_norm and isinstance(stats["equipes"], set):
+    # === Sheets: registrar apenas equipes realmente processadas (equipe_norm -> EquipeTratada) ===
+    try:
+        df_sheets = df
+        if equipes_processadas_norm:
+            df_sheets = df[df["EquipeTratada"].str.upper().isin(equipes_processadas_norm)].copy()
+            if df_sheets.empty:
+                logging.info(
+                    "DF filtrado para Sheets ficou vazio (equipes_processadas=%s). Usando DF completo para evitar perda de registro.",
+                    sorted(equipes_processadas_norm),
+                )
+                df_sheets = df.copy()
+        logging.info(
+            "Enviando DF para Sheets: linhas=%s colunas=%s",
+            len(df_sheets),
+            df_sheets.columns.tolist(),
+        )
+        registrar_dataframe_no_sheets(
+            df_sheets,
+            tipo_relatorio=tipo_relatorio,
+            nome_relatorio=nome_relatorio_chave,
+        )
+    except Exception:
+        logging.warning("Não foi possível registrar dados no Google Sheets.", exc_info=True)
+
+    # === Pendências ===
+    if equipes_selecionadas_norm:
+        # Quando há seleção explícita, consideramos pendências apenas do que foi processado nesta execução.
+        equipes_previstas_norm = {eq for eq in equipes_processadas_norm if eq}
+    elif not equipes_previstas_norm and isinstance(stats["equipes"], set):
         equipes_previstas_norm = {
             valor
             for valor in (normalizar_equipe_valor(eq) for eq in stats["equipes"])
@@ -317,7 +346,7 @@ def processar_csv(
         for equipe in pendencias_nao_processadas:
             logs.append({
                 "type": "warning",
-                "message": f" Envio pendente para {equipe}. Nenhuma mensagem foi enviada para esta equipe nesta execucao."
+                "message": f" Envio pendente para {equipe}. Nenhuma mensagem foi enviada para esta execucao."
             })
         equipes_com_erro.update(pendencias_nao_processadas)
         stats["erro"] += len(pendencias_nao_processadas)

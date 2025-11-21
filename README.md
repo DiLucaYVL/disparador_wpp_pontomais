@@ -10,6 +10,7 @@
 - [Tecnologias](#tecnologias)
 - [Arquitetura](#arquitetura)
 - [Instalação](#instalação)
+- [Integração com Google Sheets](#integração-com-google-sheets)
 - [Uso](#uso)
 
 ## Descrição
@@ -150,17 +151,30 @@ EVOLUTION_TOKEN=seu-token
 
 ### Instalação com Docker
 
+1. **Build da imagem**
 ```bash
-# Build da imagem
 docker build -t topfama-disparador .
+```
 
-# Executar container
+2. **Subir o container expondo em 192.168.99.50:8000**
+```bash
 docker run -d \
   --name disparador \
-  -p 5000:5000 \
   --env-file .env \
+  -p 192.168.99.50:8000:8000 \
+  -v disparador_uploads:/app/uploads \
+  -v disparador_logs:/app/log \
+  -v disparador_task_status:/app/task_status \
+  -v disparador_secrets:/app/secrets \
   topfama-disparador
 ```
+
+3. **Alternativa com Docker Compose**
+```bash
+docker compose up -d
+```
+
+> Ajuste o `.env` antes de subir a imagem. Os volumes mantêm uploads, logs e histórico fora do container.
 
 ### Configuração de Produção
 
@@ -201,6 +215,31 @@ server {
 - **EVOLUTION_URL**: variável de ambiente que aponta para a Evolution API
   externa, responsável pelo envio das mensagens de WhatsApp. Defina esse valor
   no arquivo `.env`.
+
+## Integração com Google Sheets
+
+### O que ela faz
+- Após o upload do CSV, o DataFrame processado é enviado para a planilha indicada.
+- Se a aba estiver vazia, o cabeçalho é criado automaticamente; novas linhas são sempre anexadas abaixo das existentes.
+- Duas colunas extras são gravadas: `TipoRelatorio` e `NomeRelatorio` (quando informado), para rastrear a origem dos dados.
+
+### Como configurar
+1. Acesse o **Google Cloud Console** e habilite a **Google Sheets API**.
+2. Crie uma **Service Account**, gere a chave JSON e baixe o arquivo.
+3. Abra a planilha de destino e compartilhe com o e-mail da Service Account com permissão de **Editor**.
+4. Preencha o `.env` com as variáveis abaixo (arquivos `.env` nunca devem ser versionados):
+   - `GOOGLE_SHEETS_ENABLED=true`
+   - `GOOGLE_SHEETS_SPREADSHEET_ID=<ID da planilha>` (o ID fica entre `/d/` e `/edit` na URL).
+   - `GOOGLE_SHEETS_WORKSHEET=Dados` (ou o nome da aba que preferir; se não existir, a aba será criada).
+   - Defina **uma** das opções de credencial:
+     - `GOOGLE_SHEETS_CREDENTIALS_FILE=/caminho/para/sua-chave.json` **ou**
+     - `GOOGLE_SHEETS_CREDENTIALS_JSON={"type": "...", ...}` (conteúdo completo do JSON em uma única linha).
+5. Reinstale dependências para incluir o cliente de Sheets:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+Pronto: ao subir um novo CSV pela interface, as linhas processadas serão copiadas para o Google Sheets escolhido.
 
 ## Uso
 

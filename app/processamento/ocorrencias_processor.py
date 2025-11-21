@@ -68,5 +68,18 @@ def processar_ocorrencias(df: pd.DataFrame) -> pd.Series:
             motivos=motivos,
         )
 
-    mensagens_ocorrencias = df.groupby(["Nome", "Data"], group_keys=False).apply(compilar_mensagens)
-    return mensagens_ocorrencias.dropna()
+    indices = []
+    valores = []
+    for (nome_grupo, data_grupo), grupo in df.groupby(["Nome", "Data"], sort=False):
+        checado = compilar_mensagens(grupo)
+        if checado is not None:
+            indices.append((nome_grupo, data_grupo))
+            valores.append(checado)
+
+    if not valores:
+        return pd.Series(dtype=object)
+
+    return pd.Series(
+        valores,
+        index=pd.MultiIndex.from_tuples(indices, names=["Nome", "Data"]),
+    )

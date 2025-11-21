@@ -1,6 +1,8 @@
 import unicodedata
 from typing import List, Optional
 
+import pandas as pd
+
 from app.processamento.ocorrencias_processor import processar_ocorrencias
 from app.types import MensagemDetalhada
 
@@ -153,7 +155,19 @@ def gerar_mensagens(df, tipo_relatorio):
     if tipo_normalizado == "auditoria":
         if 'FaltaAbonadaJustificada' not in df.columns:
             df['FaltaAbonadaJustificada'] = False
-        mensagens = df.groupby(["Nome", "Data"], group_keys=False).apply(lambda g: gerar_mensagem(g))
+        indices = []
+        valores = []
+        for (nome_grupo, data_grupo), grupo in df.groupby(["Nome", "Data"], sort=False):
+            resultado = gerar_mensagem(grupo)
+            if resultado is not None:
+                indices.append((nome_grupo, data_grupo))
+                valores.append(resultado)
+        if not valores:
+            return pd.Series(dtype=object)
+        mensagens = pd.Series(
+            valores,
+            index=pd.MultiIndex.from_tuples(indices, names=["Nome", "Data"]),
+        )
 
     elif tipo_normalizado in {"ocorrencias", "ocorrências"}:
         mensagens = processar_ocorrencias(df)

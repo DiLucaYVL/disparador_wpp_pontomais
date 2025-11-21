@@ -5,8 +5,9 @@ Este repositório contém o projeto **Disparador de Avisos de Ponto via WhatsApp
 ## Configuração do ambiente
 
 - Utilize Python 3.9 ou superior.
-- Crie e ative um ambiente virtual (`python -m venv .venv && source .venv/bin/activate`).
-- Instale as dependências com `pip install -r requirements.txt`.
+- Crie um ambiente virtual com `python -m venv .venv` e ative-o antes de qualquer comando (`source .venv/bin/activate` no Linux/macOS ou `.\.venv\Scripts\activate` no Windows).
+- Instale as dependências com `pip install -r requirements.txt` e sempre adicione novas bibliotecas dentro do `.venv`.
+- Sempre que instalar ou atualizar uma dependência, atualize o `requirements.txt` (por exemplo, `pip freeze > requirements.txt`).
 - Copie `.env.example` para `.env` e ajuste as variáveis necessárias (nunca versione `.env`).
 
 ## Diretrizes de desenvolvimento
