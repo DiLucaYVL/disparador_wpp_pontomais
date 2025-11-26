@@ -12,11 +12,10 @@ services:
       - uploads_data:/app/uploads
       - logs_data:/app/log
       - task_status_data:/app/task_status
-      - secrets_data:/app/secrets
+      - ./secrets:/app/secrets:ro
     restart: unless-stopped
 
 volumes:
   uploads_data:
   logs_data:
   task_status_data:
-  secrets_data:
