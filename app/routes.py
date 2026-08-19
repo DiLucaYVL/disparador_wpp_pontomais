@@ -33,74 +33,62 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def _evo_headers():
     return {"Content-Type": "application/json", "apikey": EVOLUTION_TOKEN}
 
-def verificar_sessao() -> bool:
+def verificar_sessao() -> tuple[bool, str]:
     """Garante que a sessão do WhatsApp esteja ativa.
 
-    A Evolution pode retornar lista de instâncias ou um objeto.
-    Esta função trata ambos para evitar erros do tipo 'list' não possui 'get'.
-    """
-    url = urljoin(
-        EVOLUTION_URL,
-        f"/instance/fetchInstances?instanceName={EVOLUTION_INSTANCE}",
-    )
-    try:
-        resp = requests.get(url, headers=_evo_headers(), timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
+    Tenta obter o status da instância de duas formas diferentes para maior robustez.
 
-        estado = None
-        if isinstance(data, list):
-            try:
+    Returns:
+        Uma tupla contendo (True, "Conectado") ou (False, "Desconectado").
+    """
+    urls_tentativas = [
+        urljoin(
+            EVOLUTION_URL,
+            f"/instance/fetchInstances?instanceName={EVOLUTION_INSTANCE}",
+        ),
+        urljoin(EVOLUTION_URL, f"/instance/connectionState/{EVOLUTION_INSTANCE}"),
+    ]
+
+    for url in urls_tentativas:
+        try:
+            resp = requests.get(url, headers=_evo_headers(), timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+
+            estado = None
+            if isinstance(data, list):
+                # Lógica para encontrar a instância correta na lista
                 alvo = next(
                     (
                         item for item in data
                         if isinstance(item, dict)
-                        and (
-                            item.get("instanceName") == EVOLUTION_INSTANCE
-                            or item.get("instance", {}).get("instanceName") == EVOLUTION_INSTANCE
-                        )
+                        and item.get("instance", {}).get("instanceName") == EVOLUTION_INSTANCE
                     ),
-                    data[0] if data else {},
+                    None,
                 )
-            except Exception:  # noqa: BLE001
-                alvo = {}
-            if isinstance(alvo, dict):
-                estado = (
-                    alvo.get("state")
-                    or alvo.get("connectionState")
-                    or alvo.get("instance", {}).get("state")
-                )
-        elif isinstance(data, dict):
-            estado = (
-                data.get("state")
-                or data.get("connectionState")
-                or data.get("instance", {}).get("state")
-            )
+                if alvo:
+                    estado = alvo.get("instance", {}).get("state")
+            elif isinstance(data, dict):
+                # Lógica para extrair o estado de um objeto único
+                if "instance" in data and "state" in data["instance"]:
+                    estado = data["instance"]["state"]
+                elif "state" in data:
+                    estado = data["state"]
 
-        if isinstance(estado, str) and estado.lower() == "open":
-            return True
-    except Exception as exc:  # noqa: BLE001
-        logging.error("Erro ao verificar instâncias: %s", exc)
+            if isinstance(estado, str) and estado.lower() == "open":
+                return True, "Conectado"
 
-    url = urljoin(EVOLUTION_URL, f"/instance/connect/{EVOLUTION_INSTANCE}")
-    try:
-        resp = requests.get(url, headers=_evo_headers(), timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        estado = None
-        if isinstance(data, dict):
-            estado = (
-                data.get("state")
-                or data.get("connectionState")
-                or data.get("instance", {}).get("state")
-            )
-        return isinstance(estado, str) and estado.lower() == "open"
-    except Exception as exc:  # noqa: BLE001
-        logging.error("Erro ao conectar instância: %s", exc)
-        return False
+        except requests.RequestException as exc:
+            logging.warning("Falha ao verificar sessão na URL %s: %s", url, exc)
+        except Exception:
+            # Ignora outros erros (JSON inválido, etc.) e tenta a próxima URL
+            logging.warning("Erro inesperado ao processar resposta da URL %s.", url)
+
+    return False, "Desconectado"
 
 def enviar_whatsapp(numero, mensagem, equipe=None):
-    if not verificar_sessao():
+    sessao_ativa, _ = verificar_sessao()
+    if not sessao_ativa:
         logging.error("Sessão do WhatsApp desconectada")
         raise RuntimeError("Sessão do WhatsApp desconectada")
 
@@ -369,22 +357,35 @@ def well_known(subpath):
 @api_bp.route('/whatsapp/status', methods=['GET'])
 def whatsapp_status():
     try:
-        url = urljoin(EVOLUTION_URL, f"/instance/connectionState/{EVOLUTION_INSTANCE}")
-        resp = requests.get(url, headers=_evo_headers(), timeout=30)
-        return jsonify(resp.json()), resp.status_code
+        conectado, status_msg = verificar_sessao()
+        return jsonify({"status": status_msg, "connected": conectado})
     except Exception as exc:  # noqa: BLE001
         logging.exception("Erro ao obter status do WhatsApp")
         return jsonify({"error": str(exc)}), 500
 
 @api_bp.route('/whatsapp/qr', methods=['GET'])
 def whatsapp_qr():
+    """Tenta conectar e retorna o QR code, se aplicável."""
     try:
         url = urljoin(EVOLUTION_URL, f"/instance/connect/{EVOLUTION_INSTANCE}")
-        resp = requests.get(url, headers=_evo_headers(), timeout=30)
-        return jsonify(resp.json()), resp.status_code
+        resp = requests.get(url, headers=_evo_headers(), timeout=45)
+        resp.raise_for_status()
+
+        data = resp.json()
+        qr_code = data.get("base64") or data.get("qrcode")
+
+        return jsonify(
+            {
+                "instance": EVOLUTION_INSTANCE,
+                "qr_code": qr_code,
+            }
+        )
+    except requests.RequestException as exc:
+        logging.error("Erro de comunicação ao obter QR Code: %s", exc)
+        return jsonify({"error": "Falha de comunicação com a API", "details": str(exc)}), 502
     except Exception as exc:  # noqa: BLE001
-        logging.exception("Erro ao obter QR Code do WhatsApp")
-        return jsonify({"error": str(exc)}), 500
+        logging.exception("Erro inesperado ao obter QR Code do WhatsApp")
+        return jsonify({"error": "Erro interno do servidor", "details": str(exc)}), 500
 
 @api_bp.route('/whatsapp/instance', methods=['GET'])
 def whatsapp_instance():

@@ -39,7 +39,9 @@ def mapear_equipe(txt):
     if "marketing" in txt: return "Marketing"
     if "obras" in txt: return "Obras"
     if "transporte" in txt: return "Transporte"
-    if any(x in txt for x in ["processos", "recepção", "serviços gerais", "adm t.i"]): return "OPS"
+    if any(x in txt for x in ["t.i", " ti ", "tech", "tecnologia", "tecnologia da informação"]): return "Tech"
+    if re.search(r"\bti\b", txt): return "Tech"
+    if any(x in txt for x in ["processos", "recepção", "serviços gerais"]): return "OPS"
 
     return "Outro"
 

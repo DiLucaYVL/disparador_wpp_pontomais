@@ -27,85 +27,31 @@ export async function verificarStatusWhatsapp() {
     const historySection = document.getElementById('historySection');
 
     try {
-        // Consulta o status da conexão
         const statusRes = await createRequestWithTimeout(`${API_BASE_URL}/whatsapp/status`);
-        
         if (!statusRes.ok) {
             throw new Error(`Erro na consulta de status: ${statusRes.status}`);
         }
         
         const statusData = await statusRes.json();
-        const state = statusData.instance?.state?.toUpperCase();
+        const { connected, status } = statusData;
 
-        if (state !="OPEN" && state !="CONNECTING") {
-            console.log("📡 Status Evolution:", state);
-            console.log("📋 Status completo:", statusData);
-        }
-        
-       /* if (state === "CLOSE" || !state) {
-            nomeElem.textContent = "🔴 WhatsApp desconectado";
-            numeroElem.textContent = "Escaneie o QR Code para conectar";
-            fotoElem.src = "";
-            fotoElem.style.display = "none";
-            fotoElem.parentElement.querySelector('.avatar-placeholder').style.display = "flex";
-            qrContainer.style.display = "none";
-
-            mainContent.classList.add('hidden');
-            connectionMessage.classList.remove('hidden');
-            logoutSection.classList.add('hidden');
-            historySection.classList.add('hidden');
-
-            // NÃO fazer reconexão automática - deixar manual
-            return "CLOSE";
-        }*/
-
-        if (state === "CONNECTING" || state === "CLOSE" ) {
-            nomeElem.textContent = "📷 Escaneie o QR Code para conectar.";
-            numeroElem.textContent = "";
-            fotoElem.src = "";
-
-            // Para Evolution API, o QR code é obtido via endpoint específico
-            try {
-                const qrRes = await createRequestWithTimeout(`${API_BASE_URL}/whatsapp/qr`);
-                const qrData = await qrRes.json();
-
-                if (qrData.base64) {
-                    qrImage.src = qrData.base64;
-                    qrImage.style.display = "block";
-                    qrContainer.style.display = "block";
-                } else {
-                    console.warn("QR Code não encontrado na resposta.", qrData);
-                }
-
-            } catch (qrError) {
-                console.error("Erro ao obter QR Code:", qrError);
-            }
-
-            mainContent.classList.add('hidden');
-            connectionMessage.classList.remove('hidden');
-            logoutSection.classList.add('hidden');
-            historySection.classList.add('hidden');
-
-            // console.log("🟢 QR Code solicitado");
-            return "CONNECTING";
+        if (status && status.toUpperCase() !== 'OPEN') {
+            console.log("📡 Status WhatsApp:", status);
         }
 
-        if (state === "OPEN") {
+        if (connected) {
+            // Estado OPEN - Conectado
             try {
-                // Busca dados completos da instância
                 const instanceRes = await createRequestWithTimeout(`${API_BASE_URL}/whatsapp/instance`);
-
                 if (!instanceRes.ok) throw new Error("Erro ao buscar dados da instância");
 
                 const list = await instanceRes.json();
                 const inst = Array.isArray(list) ? list[0] : list;
-
-                // Extrai dados
+                
                 const profileName = inst?.profileName || "Ponto | DP";
                 const ownerNumber = (inst?.ownerJid || '').split('@')[0] || '';
                 const profilePictureUrl = inst?.profilePicUrl || null;
 
-                // Preenche na interface
                 nomeElem.textContent = `🟢 ${profileName}`;
                 numeroElem.textContent = `📞 ${ownerNumber}`;
 
@@ -135,28 +81,42 @@ export async function verificarStatusWhatsapp() {
             historySection.classList.remove('hidden');
             return "OPEN";
         }
+        
+        // Estado CLOSE/CONNECTING - Desconectado ou aguardando QR
+        nomeElem.textContent = "📷 Escaneie o QR Code para conectar.";
+        numeroElem.textContent = "";
+        fotoElem.src = "";
+        fotoElem.style.display = "none";
+        fotoElem.parentElement.querySelector('.avatar-placeholder').style.display = "flex";
 
-        // Estado desconhecido - apenas se não for nenhum dos estados conhecidos
-        if (state !== "CLOSE" && state !== "CONNECTING" && state !== "OPEN") {
-            nomeElem.textContent = "⚠️ Instância em estado indefinido.";
-            numeroElem.textContent = `Status: ${state}`;
-            fotoElem.src = "";
-            fotoElem.style.display = "none";
-            fotoElem.parentElement.querySelector('.avatar-placeholder').style.display = "flex";
+        try {
+            const qrRes = await createRequestWithTimeout(`${API_BASE_URL}/whatsapp/qr`);
+            const qrData = await qrRes.json();
+
+            if (qrData.qr_code) {
+                qrImage.src = qrData.qr_code;
+                qrImage.style.display = "block";
+                qrContainer.style.display = "block";
+            } else {
+                console.warn("QR Code não encontrado na resposta.", qrData);
+                qrContainer.style.display = "none";
+            }
+        } catch (qrError) {
+            console.error("Erro ao obter QR Code:", qrError);
             qrContainer.style.display = "none";
-
-            mainContent.classList.add('hidden');
-            connectionMessage.classList.remove('hidden');
-            logoutSection.classList.add('hidden');
-            historySection.classList.add('hidden');
-
-            return "ESTADO DESCONHECIDO: " +state;
         }
+
+        mainContent.classList.add('hidden');
+        connectionMessage.classList.remove('hidden');
+        logoutSection.classList.add('hidden');
+        historySection.classList.add('hidden');
+        
+        return "CLOSE";
 
     } catch (err) {
         console.error("❌ Erro ao consultar status do WhatsApp:", err);
-        nomeElem.textContent = "❌ Erro de conexão com Evolution API.";
-        numeroElem.textContent = "";
+        nomeElem.textContent = "❌ Erro de conexão com a API.";
+        numeroElem.textContent = "Verifique o console para mais detalhes.";
         fotoElem.src = "";
         fotoElem.style.display = "none";
         fotoElem.parentElement.querySelector('.avatar-placeholder').style.display = "flex";

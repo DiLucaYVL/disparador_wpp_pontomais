@@ -18,12 +18,14 @@
 O **Disparador de Aviso de Ponto** é uma solução web que automatiza o envio de mensagens WhatsApp para gestores sobre irregularidades no sistema de ponto eletrônico. A aplicação processa relatórios CSV gerados pelo PontoMais, identifica faltas, atrasos e outras ocorrências, e envia notificações personalizadas para cada equipe/loja.
 
 ### Principais funcionalidades:
-- 📊 Processamento automatizado de relatórios CSV (Auditoria e Ocorrências)
+- 📊 Processamento automatizado de relatórios CSV (Auditoria, Ocorrências e Assinaturas)
 - 💬 Integração com WhatsApp via Evolution API
 - 🎯 Envio direcionado por equipe/loja
 - ⚙️ Interface intuitiva com configurações flexíveis
 - 📋 Log detalhado de execução
-- 📈 Dashboard com estatísticas
+- 📈 Histórico de envios com exportação para Excel
+- 🔄 Processamento assíncrono com polling de status
+- 🔒 Proteção contra reenvio duplicado de relatórios
 
 ### Problema que resolve:
 Elimina o trabalho manual de análise de relatórios de ponto e notificação individual de gestores, reduzindo erros humanos e garantindo que todas as irregularidades sejam comunicadas de forma rápida e organizada.
@@ -45,11 +47,15 @@ O sistema está operacional e sendo usado ativamente pela TopFama para gestão d
 ## Tecnologias
 
 ### Backend
-- **Python 3.9+** - Linguagem principal
-- **Flask** - Framework web minimalista
+- **Python 3.11+** - Linguagem principal (imagem Docker usa `python:3.11-slim`)
+- **Flask 3.x** - Framework web
+- **Gunicorn** - Servidor WSGI para produção (`gthread` worker, porta `8000`)
 - **Pandas** - Processamento de dados CSV
 - **Requests** - Cliente HTTP para Evolution API
 - **Python-dotenv** - Gerenciamento de variáveis de ambiente
+- **openpyxl** - Exportação de histórico para Excel
+- **gspread / google-auth** - Integração opcional com Google Sheets
+- **mysql-connector-python** - Persistência em banco MySQL (histórico de envios)
 
 ### Frontend
 - **HTML5/CSS3** - Interface responsiva
@@ -57,35 +63,42 @@ O sistema está operacional e sendo usado ativamente pela TopFama para gestão d
 - **CSS Grid/Flexbox** - Layout responsivo
 - **Drag & Drop API** - Upload intuitivo de arquivos
 
+> **Node.js não é necessário.** O frontend é servido diretamente pelo Flask como arquivos estáticos (`/static`) e templates Jinja2 (`/templates`).
+
 ### Integração
 - **Evolution API** - Gateway WhatsApp
 - **SMTP** - Envio de logs por email
-- **Google Sheets API** - Configuração de números de equipes
+- **Google Sheets API** - Gravação de dados processados em planilha (opcional)
+- **MySQL** - Histórico de envios por equipe/relatório
 
 ### Infraestrutura
-- **Docker** - Containerização (opcional)
+- **Docker** - Containerização
 - **Gunicorn** - Servidor WSGI para produção
-- **Nginx** - Proxy reverso e servir arquivos estáticos
+- **Nginx** - Proxy reverso e servir arquivos estáticos (recomendado em produção)
 
 ## Arquitetura
 
 ```mermaid
 graph TB
-    A[Upload CSV] --> B[Controller]
-    B --> C[Processamento]
-    C --> D[Validações]
-    D --> E[Geração Mensagens]
-    E --> F[Evolution API]
-    F --> G[WhatsApp]
-    
-    H[Google Sheets] --> I[Números Equipes]
-    I --> B
-    
-    J[Logs] --> K[Email SMTP]
-    
+    A[Upload CSV] --> B[routes.py]
+    B --> C[tasks.py - ThreadPoolExecutor]
+    C --> D[controller.py]
+    D --> E[csv_reader / csv_reader_ocorrencias]
+    E --> F["mensagem.py / mensagem_assinaturas.py"]
+    F --> G[routes.py - enviar_whatsapp]
+    G --> H[Evolution API]
+    H --> I[WhatsApp]
+
+    J[numeros_equipes.py] --> D
+    J --> K["Google Sheets / CSV público"]
+
+    D --> L[history.py - MySQL]
+    B --> M["historico/dados / exportar"]
+    M --> L
+
     style A fill:#e1f5fe
-    style G fill:#c8e6c9
-    style F fill:#fff3e0
+    style I fill:#c8e6c9
+    style H fill:#fff3e0
 ```
 
 <details>
@@ -93,26 +106,37 @@ graph TB
 
 ### Fluxo Principal:
 1. **Upload**: Interface recebe arquivo CSV via drag-and-drop ou seleção
-2. **Processamento**: Sistema identifica tipo de relatório e valida estrutura
-3. **Mapeamento**: Equipes são categorizadas (CD, Lojas, Departamentos)
-4. **Mensagens**: Templates personalizados por tipo de ocorrência
-5. **Envio**: Integração com Evolution API para WhatsApp
-6. **Logs**: Rastreamento completo com envio por email em caso de erro
+2. **Enfileiramento**: A rota `/enviar` salva o arquivo e agenda a tarefa com `ThreadPoolExecutor`
+3. **Polling**: O frontend consulta `/status/<task_id>` até o processamento terminar
+4. **Mapeamento**: Equipes são categorizadas (CD, Lojas, Departamentos)
+5. **Mensagens**: Templates personalizados por tipo de ocorrência
+6. **Envio**: Integração com Evolution API para WhatsApp
+7. **Histórico**: Registros gravados no MySQL com status de sucesso/erro
 
 ### Componentes Principais:
-- `controller.py` - Orquestração do fluxo principal
-- `csv_reader.py` - Parser especializado para PontoMais
-- `mensagem.py` - Templates e formatação de mensagens
-- `whatsapp.js` - Cliente frontend para Evolution API
+- `app/routes.py` — Blueprint Flask com todos os endpoints da API
+- `app/tasks.py` — Fila de tarefas assíncronas com `ThreadPoolExecutor`
+- `app/controller.py` — Orquestração do fluxo de processamento e envio
+- `app/processamento/csv_reader.py` — Parser para relatórios de Auditoria
+- `app/processamento/csv_reader_ocorrencias.py` — Parser para relatórios de Ocorrências
+- `app/processamento/csv_reader_assinaturas.py` — Parser para relatórios de Assinaturas
+- `app/whatsapp/mensagem.py` — Templates e geração de mensagens (Auditoria/Ocorrências)
+- `app/whatsapp/mensagem_assinaturas.py` — Templates para relatórios de Assinaturas
+- `app/whatsapp/numeros_equipes.py` — Resolução de número de WhatsApp por equipe
+- `app/history.py` — Leitura e gravação do histórico de envios (MySQL)
+- `app/history_export.py` — Exportação do histórico para planilha Excel
+- `app/services/google_sheets.py` — Integração com Google Sheets
+- `app/services/email_sender.py` — Envio de logs por SMTP
+- `app/config/settings.py` — Leitura centralizada das variáveis de ambiente
 </details>
 
 ## Instalação
 
 ### Pré-requisitos
 
-- Python 3.9 ou superior
-- Node.js 16+ (para desenvolvimento frontend)
+- Python 3.11 ou superior
 - Evolution API configurada e rodando
+- MySQL acessível (para histórico de envios)
 - Conta Google com Sheets API habilitada (opcional)
 
 ### Instalação Local
@@ -120,15 +144,15 @@ graph TB
 1. **Clone o repositório:**
 ```bash
 git clone https://github.com/DiLucaYVL/disparador_wpp_pontomais.git
-cd disparador-ponto
+cd disparador_wpp_pontomais
 ```
 
 2. **Crie um ambiente virtual:**
 ```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
 # ou
-venv\Scripts\activate     # Windows
+.\.venv\Scripts\activate   # Windows
 ```
 
 3. **Instale as dependências:**
@@ -147,6 +171,18 @@ Exemplo de `.env`:
 EVOLUTION_URL=http://localhost:8080
 EVOLUTION_INSTANCE=seu-instance
 EVOLUTION_TOKEN=seu-token
+
+DB_HOST=192.168.99.50
+DB_PORT=3306
+DB_NAME=enviodp
+DB_USER=seu-usuario
+DB_PASSWORD=sua-senha
+```
+
+5. **Execute localmente:**
+```bash
+python main.py
+# Aplicação disponível em http://localhost:8000
 ```
 
 ### Instalação com Docker
@@ -181,24 +217,25 @@ docker compose up -d
 <details>
 <summary>Deploy com Nginx e Gunicorn</summary>
 
-```bash
-# Instalar Gunicorn
-pip install gunicorn
+O Gunicorn é iniciado automaticamente pelo Docker com as configurações do `gunicorn.conf.py` (porta `8000`, worker `gthread`, timeout de 10 minutos).
 
-# Executar
-gunicorn --bind 0.0.0.0:5000 --workers 4 main:app
+Para deploy manual com Nginx como proxy reverso:
+
+```bash
+# Executar com configuração existente
+gunicorn -c gunicorn.conf.py main:app
 
 # Configurar Nginx (exemplo)
 server {
     listen 80;
     server_name seu-dominio.com;
-    
+
     location / {
-        proxy_pass http://localhost:5000;
+        proxy_pass http://localhost:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
-    
+
     location /static {
         alias /caminho/para/static;
         expires 1d;
@@ -209,6 +246,8 @@ server {
 
 #### URLs da aplicação
 
+- **Interface web**: `http://<host>:8000/` — tela principal de envio de relatórios
+- **Histórico**: `http://<host>:8000/historico` — página de histórico de envios
 - **API interna**: o frontend usa automaticamente `window.location.origin` para
   conversar com o backend Flask. Dessa forma, a mesma URL acessada no
   navegador é reutilizada nas requisições.
@@ -245,21 +284,17 @@ Pronto: ao subir um novo CSV pela interface, as linhas processadas serão copiad
 
 ### 1. Conectar WhatsApp
 
-Acesse a interface web e escaneie o QR Code com seu WhatsApp:
-
-```javascript
-// O sistema detecta automaticamente o status da conexão
-// Interface é liberada apenas após conexão confirmada
-```
+Acesse a interface web e escaneie o QR Code com seu WhatsApp. O sistema exibe o status de conexão em tempo real consultando a Evolution API.
 
 ### 2. Upload de Relatório
 
 Faça upload do arquivo CSV gerado pelo PontoMais:
 
 ```bash
-# Formatos suportados:
-- Relatório de Auditoria (faltas, horas extras, etc.)
-- Relatório de Ocorrências (ajustes pendentes, etc.)
+# Tipos de relatório suportados:
+- Auditoria    (faltas, horas extras, interjornada, etc.)
+- Ocorrências  (ajustes pendentes, etc.)
+- Assinaturas  (pendências de assinatura de ponto)
 ```
 
 ### 3. Configurações
@@ -268,16 +303,25 @@ Faça upload do arquivo CSV gerado pelo PontoMais:
 // Opções disponíveis:
 {
   "ignorarSabados": true,        // Ignora ocorrências de sábado
-  "tipoRelatorio": "Auditoria",  // Auditoria ou Ocorrências
-  "equipesSelecionadas": ["CD10", "LOJA 75", "RH"]  // Filtros opcionais
+  "tipoRelatorio": "Auditoria",  // "Auditoria", "Ocorrências" ou "Assinaturas"
+  "equipesSelecionadas": ["CD10", "LOJA 75", "RH"],  // Filtros opcionais
+  "debugMode": false,            // Retorna o DataFrame parsed no resultado
+  "forcarReenvio": false         // Força reenvio de relatório já concluído
 }
 ```
 
-### 4. Execução
+### 4. Processamento Assíncrono
 
-```python
-# Exemplo de mensagem gerada automaticamente:
-"""
+O envio é processado em segundo plano. A interface consulta o status periodicamente:
+
+```
+POST /enviar        → retorna task_id (HTTP 202)
+GET  /status/{id}   → { status: "queued" | "running" | "done" | "error", log, stats }
+```
+
+### 5. Exemplo de Mensagem
+
+```
 *LOJA 75*
 
 *NO DIA 15/01/2024:*
@@ -286,7 +330,6 @@ Faça upload do arquivo CSV gerado pelo PontoMais:
 
 *NO DIA 16/01/2024:*
 • Carlos Oliveira ficou devendo 02:30 horas. Por favor justificar.
-"""
 ```
 
 ### API Endpoints
@@ -295,40 +338,68 @@ Faça upload do arquivo CSV gerado pelo PontoMais:
 <summary>Endpoints Disponíveis</summary>
 
 ```bash
-# Enviar mensagens
-POST /enviar
-Content-Type: multipart/form-data
-{
-  "csvFile": arquivo,
-  "ignorarSabados": boolean,
-  "tipoRelatorio": string,
-  "equipesSelecionadas": array
-}
+# Configurações da instância Evolution
+GET /config
+→ { EVOLUTION_URL, EVOLUTION_INSTANCE }
 
-# Obter equipes do CSV
+# Extrair equipes disponíveis no CSV
 POST /equipes
 Content-Type: multipart/form-data
-{
-  "csvFile": arquivo,
-  "tipoRelatorio": string
-}
+{ csvFile, ignorarSabados, tipoRelatorio }
 
-# Status da aplicação
-GET /health
+# Enviar relatório (agendamento assíncrono)
+POST /enviar
+Content-Type: multipart/form-data
+{ csvFile, ignorarSabados, tipoRelatorio, equipesSelecionadas, debugMode, forcarReenvio }
+→ HTTP 202 { success, task_id, message }
+→ HTTP 409 { code: "relatorio_concluido" | "relatorio_sem_pendencias" }
+
+# Consultar status da tarefa
+GET /status/<task_id>
+→ { status: "queued"|"running"|"done"|"error", log, stats, nome_arquivo_log }
+
+# Consultar status de um relatório pelo nome
+GET /relatorios/status?nome=<nome_relatorio>
+→ { status: "novo"|"sucesso_total"|"envio_parcial", relatorio }
+
+# Status do WhatsApp
+GET /whatsapp/status
+→ { status, connected }
+
+# Obter QR Code para conexão
+GET /whatsapp/qr
+→ { instance, qr_code }
+
+# Dados brutos da instância Evolution
+GET /whatsapp/instance
+
+# Desconectar WhatsApp
+DELETE /whatsapp/logout
+
+# Histórico de envios (com filtros opcionais)
+GET /historico/dados?equipes=&tipos=&inicio=&fim=
+→ { dados, resumo: { total, sucessos, erros }, equipes }
+
+# Exportar histórico para Excel
+GET /historico/exportar?equipes=&tipos=&inicio=&fim=
+→ .xlsx (download)
 ```
 </details>
 
 ### Customização de Mensagens
 
 ```python
-# Edite app/whatsapp/mensagem.py para personalizar templates:
+# Edite app/whatsapp/mensagem.py para personalizar templates de Auditoria:
 
 TEMPLATES = {
     "Falta": "*{nome}* _faltou_. Por favor *justificar*.",
+    "Horas Faltantes": "*{nome}* ficou devendo *{horas}*. Por favor *justificar*.",
     "Horas extras": "*{nome}* fez mais de 2 horas extras. _Total_: *{valor}*. Por favor *ajustar*.",
+    "Interjornada insuficiente": "*{nome}* teve interjornada menor que 11h. _Tempo registrado_: *{horas}*.",
+    "Intrajornada insuficiente": "*{nome}* teve pausa de almoço menor que 1h. _Tempo registrado_: *{horas}*.",
+    "Mais de 6 dias de trabalho consecutivos": "*{nome}* está com mais de 6 dias consecutivos de trabalho. O colaborador deve *pegar folga* na semana seguinte.",
     # Adicione novos templates conforme necessário
 }
+
+# Para mensagens de Assinaturas, edite app/whatsapp/mensagem_assinaturas.py
 ```
-
-
-</div>

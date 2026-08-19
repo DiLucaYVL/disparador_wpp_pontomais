@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from app.controller import processar_csv
+from app.routes import verificar_sessao
 
 # Executor global por processo
 _executor = ThreadPoolExecutor(max_workers=4)
@@ -100,6 +101,17 @@ def enqueue_csv_processing(
 
     def _run() -> None:
         _persist_task_state(task_id, status='running', result=None, error=None)
+        
+        sessao_ativa, _ = verificar_sessao()
+        if not sessao_ativa:
+            _persist_task_state(
+                task_id,
+                status='error',
+                result=None,
+                error='A instância do WhatsApp não está conectada. Por favor, reconecte e tente novamente.',
+            )
+            return
+        
         try:
             logs, stats, nome_arquivo_log = processar_csv(
                 filepath,
