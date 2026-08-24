@@ -6,6 +6,7 @@ import logging
 import uuid
 import random
 import time
+import threading
 from datetime import datetime
 import requests
 from urllib.parse import urljoin
@@ -30,8 +31,22 @@ api_bp = Blueprint('api', __name__)
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+CONNECTING_TIMEOUT_SECONDS = 60
+_connecting_since: float | None = None
+_connecting_lock = threading.Lock()
+
 def _evo_headers():
     return {"Content-Type": "application/json", "apikey": EVOLUTION_TOKEN}
+
+def _desconectar_instancia() -> bool:
+    """Envia requisição de logout para a Evolution API para fechar a sessão."""
+    try:
+        url = urljoin(EVOLUTION_URL, f"/instance/logout/{EVOLUTION_INSTANCE}")
+        resp = requests.delete(url, headers=_evo_headers(), timeout=15)
+        return resp.status_code in (200, 201)
+    except Exception as exc:  # noqa: BLE001
+        logging.warning("Erro ao tentar desconectar instância %s: %s", EVOLUTION_INSTANCE, exc)
+        return False
 
 def _extrair_estado(data, instance_name: str) -> str | None:
     """Extrai o estado de conexão da instância a partir da resposta da Evolution API."""
@@ -75,10 +90,14 @@ def verificar_sessao() -> tuple[bool, str]:
     """Garante que a sessão do WhatsApp esteja ativa.
 
     Tenta obter o status da instância consultando a Evolution API.
+    Se a instância permanecer em 'connecting' por mais de 60 segundos,
+    força o encerramento da sessão (logout) para que retorne a 'close'.
 
     Returns:
         Uma tupla contendo (True, "open") ou (False, estado).
     """
+    global _connecting_since
+
     urls_tentativas = [
         urljoin(EVOLUTION_URL, f"/instance/connectionState/{EVOLUTION_INSTANCE}"),
         urljoin(
@@ -99,12 +118,32 @@ def verificar_sessao() -> tuple[bool, str]:
             if estado:
                 ultimo_estado = estado
                 if estado == "open":
+                    with _connecting_lock:
+                        _connecting_since = None
                     return True, "open"
+                break
 
         except requests.RequestException as exc:
             logging.warning("Falha ao verificar sessão na URL %s: %s", url, exc)
         except Exception:
             logging.warning("Erro inesperado ao processar resposta da URL %s.", url)
+
+    with _connecting_lock:
+        if ultimo_estado == "connecting":
+            agora = time.time()
+            if _connecting_since is None:
+                _connecting_since = agora
+            elif agora - _connecting_since >= CONNECTING_TIMEOUT_SECONDS:
+                logging.warning(
+                    "Instância %s permaneceu em 'connecting' por mais de %ds. Forçando logout para 'close'.",
+                    EVOLUTION_INSTANCE,
+                    CONNECTING_TIMEOUT_SECONDS,
+                )
+                _desconectar_instancia()
+                _connecting_since = None
+                ultimo_estado = "close"
+        else:
+            _connecting_since = None
 
     return False, ultimo_estado
 
