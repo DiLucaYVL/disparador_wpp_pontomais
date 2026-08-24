@@ -33,10 +33,15 @@ export async function verificarStatusWhatsapp() {
         }
         
         const statusData = await statusRes.json();
-        const { connected, status } = statusData;
+        const connected = Boolean(
+            statusData.connected
+            || (typeof statusData.status === 'string' && statusData.status.toLowerCase() === 'open')
+            || (typeof statusData.state === 'string' && statusData.state.toLowerCase() === 'open')
+        );
+        const estadoAtual = (statusData.state || statusData.status || '').toLowerCase();
 
-        if (status && status.toUpperCase() !== 'OPEN') {
-            console.log("📡 Status WhatsApp:", status);
+        if (estadoAtual && estadoAtual !== 'open') {
+            console.log("📡 Status WhatsApp:", estadoAtual);
         }
 
         if (connected) {
@@ -46,14 +51,16 @@ export async function verificarStatusWhatsapp() {
                 if (!instanceRes.ok) throw new Error("Erro ao buscar dados da instância");
 
                 const list = await instanceRes.json();
-                const inst = Array.isArray(list) ? list[0] : list;
+                const rawInst = Array.isArray(list) ? list[0] : list;
+                const inst = (rawInst && typeof rawInst === 'object' && rawInst.instance) ? rawInst.instance : (rawInst || {});
                 
-                const profileName = inst?.profileName || "Ponto | DP";
-                const ownerNumber = (inst?.ownerJid || '').split('@')[0] || '';
-                const profilePictureUrl = inst?.profilePicUrl || null;
+                const profileName = inst?.profileName || inst?.name || inst?.instanceName || "WhatsApp Conectado";
+                const rawNumber = inst?.ownerJid || inst?.owner || inst?.number || inst?.id || '';
+                const ownerNumber = rawNumber ? rawNumber.split('@')[0].replace(/\D/g, '') : '';
+                const profilePictureUrl = inst?.profilePictureUrl || inst?.profilePicUrl || null;
 
                 nomeElem.textContent = `🟢 ${profileName}`;
-                numeroElem.textContent = `📞 ${ownerNumber}`;
+                numeroElem.textContent = ownerNumber ? `📞 ${ownerNumber}` : '';
 
                 if (profilePictureUrl) {
                     fotoElem.src = profilePictureUrl;
@@ -67,7 +74,7 @@ export async function verificarStatusWhatsapp() {
 
             } catch (profileError) {
                 console.warn("Erro ao obter dados da instância:", profileError);
-                nomeElem.textContent = `🟢 Conectado`;
+                nomeElem.textContent = `🟢 WhatsApp Conectado`;
                 numeroElem.textContent = '';
                 fotoElem.src = "";
                 fotoElem.style.display = "none";
@@ -82,9 +89,15 @@ export async function verificarStatusWhatsapp() {
             return "OPEN";
         }
         
-        // Estado CLOSE/CONNECTING - Desconectado ou aguardando QR
-        nomeElem.textContent = "📷 Escaneie o QR Code para conectar.";
-        numeroElem.textContent = "";
+        // Estado CLOSE / CONNECTING - Desconectado ou aguardando QR
+        if (estadoAtual === 'connecting') {
+            nomeElem.textContent = "🔄 Conectando ao WhatsApp...";
+            numeroElem.textContent = "Aguarde ou escaneie o QR Code abaixo.";
+        } else {
+            nomeElem.textContent = "📷 Escaneie o QR Code para conectar.";
+            numeroElem.textContent = "";
+        }
+
         fotoElem.src = "";
         fotoElem.style.display = "none";
         fotoElem.parentElement.querySelector('.avatar-placeholder').style.display = "flex";
@@ -94,7 +107,11 @@ export async function verificarStatusWhatsapp() {
             const qrData = await qrRes.json();
 
             if (qrData.qr_code) {
-                qrImage.src = qrData.qr_code;
+                let qrSrc = qrData.qr_code;
+                if (typeof qrSrc === 'string' && !qrSrc.startsWith('data:image') && !qrSrc.startsWith('http')) {
+                    qrSrc = `data:image/png;base64,${qrSrc}`;
+                }
+                qrImage.src = qrSrc;
                 qrImage.style.display = "block";
                 qrContainer.style.display = "block";
             } else {
@@ -111,7 +128,7 @@ export async function verificarStatusWhatsapp() {
         logoutSection.classList.add('hidden');
         historySection.classList.add('hidden');
         
-        return "CLOSE";
+        return estadoAtual ? estadoAtual.toUpperCase() : "CLOSE";
 
     } catch (err) {
         console.error("❌ Erro ao consultar status do WhatsApp:", err);
