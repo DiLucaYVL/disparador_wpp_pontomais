@@ -32,17 +32,27 @@ def _grupo_horas_extras(valor):
     ])
 
 
-def test_gerar_mensagem_envia_poucos_minutos_extras():
+def test_gerar_mensagem_ignora_poucos_minutos_extras():
     resultado = gerar_mensagem(_grupo_horas_extras("00:05"))
-    assert resultado is not None
-    assert "5 minutos extras" in resultado.texto
-    assert "Fulano" in resultado.texto
+    assert resultado is None
 
 
-def test_gerar_mensagem_envia_horas_extras_inteiras():
+def test_gerar_mensagem_ignora_abaixo_do_corte_de_2h():
+    resultado = gerar_mensagem(_grupo_horas_extras("01:59"))
+    assert resultado is None
+
+
+def test_gerar_mensagem_envia_a_partir_de_2h():
     resultado = gerar_mensagem(_grupo_horas_extras("02:00"))
     assert resultado is not None
     assert "2 horas extras" in resultado.texto
+    assert "Fulano" in resultado.texto
+
+
+def test_gerar_mensagem_envia_horas_e_minutos_acima_do_corte():
+    resultado = gerar_mensagem(_grupo_horas_extras("02:15"))
+    assert resultado is not None
+    assert "2 horas e 15 minutos extras" in resultado.texto
 
 
 def test_gerar_mensagem_ignora_zero_horas_extras():

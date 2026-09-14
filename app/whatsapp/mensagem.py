@@ -142,7 +142,7 @@ def gerar_mensagem(grupo) -> Optional[MensagemDetalhada]:
                 h, m = map(int, valor.strip().split(":"))
             except Exception:
                 continue
-            if h == 0 and m == 0:
+            if h * 60 + m < 120:
                 continue
 
         tpl = TEMPLATES.get(ocorr.strip())
