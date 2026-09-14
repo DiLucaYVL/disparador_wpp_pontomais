@@ -13,6 +13,14 @@ const modalOverlay = document.getElementById('modalOverlay');
 const modalReenvio = document.getElementById('confirmReenvioModal');
 const modalConfirmarBtn = document.getElementById('confirmReenvioConfirmar');
 const modalCancelarBtn = document.getElementById('confirmReenvioCancelar');
+const modalDuplicidade = document.getElementById('confirmDuplicidadeModal');
+const modalDuplicidadeTexto = document.getElementById('confirmDuplicidadeTexto');
+const modalDuplicidadeNovasBtn = document.getElementById('confirmDuplicidadeApenasNovas');
+const modalDuplicidadeTodasBtn = document.getElementById('confirmDuplicidadeTodas');
+const modalSelecaoArquivo = document.getElementById('confirmSelecaoArquivoModal');
+const modalSelecaoCheckbox = document.getElementById('confirmSelecaoApenasGestor');
+const modalSelecaoContinuarBtn = document.getElementById('confirmSelecaoContinuar');
+const modalSelecaoCancelarBtn = document.getElementById('confirmSelecaoCancelar');
 
 const RELATORIO_STATUS = {
     NOVO: 'novo',
@@ -25,6 +33,8 @@ let statusRelatorioAtual = RELATORIO_STATUS.NOVO;
 let pendenciasRelatorio = [];
 let reenvioConfirmado = false;
 let nomeRelatorioAtual = '';
+let duplicidadeInfo = null;
+let duplicidadeResposta = null;
 
 export function configurarEventos() {
     if (!arquivoInput || !sendButton) {
@@ -37,17 +47,84 @@ export function configurarEventos() {
     if (modalCancelarBtn) {
         modalCancelarBtn.addEventListener('click', fecharModalReenvio);
     }
+    if (modalDuplicidadeNovasBtn) {
+        modalDuplicidadeNovasBtn.addEventListener('click', () => resolverDuplicidade('novas'));
+    }
+    if (modalDuplicidadeTodasBtn) {
+        modalDuplicidadeTodasBtn.addEventListener('click', () => resolverDuplicidade('todas'));
+    }
+    if (modalSelecaoContinuarBtn) {
+        modalSelecaoContinuarBtn.addEventListener('click', () => continuarSelecaoArquivo(true));
+    }
+    if (modalSelecaoCancelarBtn) {
+        modalSelecaoCancelarBtn.addEventListener('click', () => continuarSelecaoArquivo(false));
+    }
     if (modalOverlay) {
-        modalOverlay.addEventListener('click', fecharModalReenvio);
+        modalOverlay.addEventListener('click', () => {
+            fecharModalReenvio();
+            fecharModalDuplicidade();
+            if (modalSelecaoArquivo && !modalSelecaoArquivo.classList.contains('hidden')) {
+                continuarSelecaoArquivo(false);
+            }
+        });
     }
 
     arquivoInput.addEventListener('change', async () => {
-        await tratarArquivoSelecionado();
+        await confirmarSelecaoArquivo();
     });
 
     sendButton.addEventListener('click', async () => {
         await enviarRelatorio();
     });
+}
+
+async function confirmarSelecaoArquivo() {
+    const arquivo = arquivoInput.files?.[0] ?? null;
+    const tipoRelatorioAtual = document.getElementById('tipoRelatorio').value;
+
+    if (arquivo && tipoRelatorioAtual === 'Ocorrências' && modalOverlay && modalSelecaoArquivo) {
+        if (modalSelecaoCheckbox) {
+            modalSelecaoCheckbox.checked = document.getElementById('apenasGestor')?.checked || false;
+        }
+        modalOverlay.classList.remove('hidden');
+        modalSelecaoArquivo.classList.remove('hidden');
+        return;
+    }
+
+    await tratarArquivoSelecionado();
+}
+
+function fecharModalSelecaoArquivo() {
+    if (!modalOverlay || !modalSelecaoArquivo) {
+        return;
+    }
+    modalOverlay.classList.add('hidden');
+    modalSelecaoArquivo.classList.add('hidden');
+}
+
+async function continuarSelecaoArquivo(confirmado) {
+    fecharModalSelecaoArquivo();
+
+    if (!confirmado) {
+        arquivoInput.value = '';
+        arquivoSelecionado = null;
+        if (fileNameLabel) {
+            fileNameLabel.textContent = '';
+            fileNameLabel.style.display = 'none';
+        }
+        limparAlertaRelatorio();
+        if (sendButton) {
+            sendButton.disabled = true;
+        }
+        return;
+    }
+
+    const apenasGestorCheckbox = document.getElementById('apenasGestor');
+    if (apenasGestorCheckbox && modalSelecaoCheckbox) {
+        apenasGestorCheckbox.checked = modalSelecaoCheckbox.checked;
+    }
+
+    await tratarArquivoSelecionado();
 }
 
 async function tratarArquivoSelecionado() {
@@ -56,6 +133,8 @@ async function tratarArquivoSelecionado() {
     pendenciasRelatorio = [];
     reenvioConfirmado = false;
     nomeRelatorioAtual = arquivoSelecionado ? arquivoSelecionado.name : '';
+    duplicidadeInfo = null;
+    duplicidadeResposta = null;
 
     if (fileNameLabel) {
         if (arquivoSelecionado) {
@@ -102,6 +181,7 @@ async function tratarArquivoSelecionado() {
     formData.append('csvFile', arquivoSelecionado);
     formData.append('ignorarSabados', document.getElementById('ignorarSabados').checked);
     formData.append('tipoRelatorio', document.getElementById('tipoRelatorio').value);
+    formData.append('apenasGestor', document.getElementById('apenasGestor')?.checked || false);
 
     try {
         const tipoRelatorioAtual = document.getElementById('tipoRelatorio').value;
@@ -127,6 +207,7 @@ async function tratarArquivoSelecionado() {
 
         if (data.success && Array.isArray(data.equipes)) {
             carregarDropdownEquipes(data.equipes);
+            duplicidadeInfo = data.duplicidade || null;
         } else {
             alert('Erro desconhecido ao processar o CSV.');
         }
@@ -154,6 +235,20 @@ async function enviarRelatorio() {
         return;
     }
 
+    const tipoRelatorio = document.getElementById('tipoRelatorio').value;
+    const apenasGestor = document.getElementById('apenasGestor')?.checked || false;
+
+    if (
+        tipoRelatorio === 'Ocorrências' &&
+        apenasGestor &&
+        duplicidadeInfo &&
+        duplicidadeInfo.duplicadas > 0 &&
+        duplicidadeResposta === null
+    ) {
+        abrirModalDuplicidade(duplicidadeInfo.duplicadas);
+        return;
+    }
+
     if (sendButton) {
         sendButton.disabled = true;
     }
@@ -161,13 +256,13 @@ async function enviarRelatorio() {
     arquivoSelecionado = fileAtual;
     const ignorarSabados = document.getElementById('ignorarSabados').checked;
     const debugMode = document.getElementById('debugMode')?.checked || false;
-    const tipoRelatorio = document.getElementById('tipoRelatorio').value;
 
     const equipesSelecionadas = Array.from(
         document.querySelectorAll('input[name="equipes"]:checked')
     ).map((elemento) => elemento.value);
 
     const forcarReenvio = statusRelatorioAtual === RELATORIO_STATUS.SUCESSO_TOTAL && reenvioConfirmado;
+    const incluirDuplicadas = duplicidadeResposta === 'todas';
     const formData = gerarFormData(
         fileAtual,
         ignorarSabados,
@@ -175,6 +270,8 @@ async function enviarRelatorio() {
         equipesSelecionadas,
         tipoRelatorio,
         forcarReenvio,
+        apenasGestor,
+        incluirDuplicadas,
     );
 
     atualizarBarraProgresso('25%');
@@ -292,6 +389,33 @@ function confirmarReenvio() {
     if (sendButton && !bloquear) {
         sendButton.disabled = false;
     }
+}
+
+function abrirModalDuplicidade(quantidadeDuplicadas) {
+    if (!modalOverlay || !modalDuplicidade) {
+        return;
+    }
+    if (modalDuplicidadeTexto) {
+        modalDuplicidadeTexto.textContent =
+            `${quantidadeDuplicadas} ocorrência(s) deste relatório já foram enviadas antes ` +
+            '(em outro upload). O que deseja fazer?';
+    }
+    modalOverlay.classList.remove('hidden');
+    modalDuplicidade.classList.remove('hidden');
+}
+
+function fecharModalDuplicidade() {
+    if (!modalOverlay || !modalDuplicidade) {
+        return;
+    }
+    modalOverlay.classList.add('hidden');
+    modalDuplicidade.classList.add('hidden');
+}
+
+async function resolverDuplicidade(escolha) {
+    duplicidadeResposta = escolha;
+    fecharModalDuplicidade();
+    await enviarRelatorio();
 }
 
 async function acompanharTarefa(taskId) {

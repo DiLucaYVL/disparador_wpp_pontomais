@@ -159,6 +159,8 @@ def init_db() -> None:
             _ensure_column(cursor, "pessoa", "VARCHAR(255) NULL")
             _ensure_column(cursor, "motivo_envio", "TEXT NULL")
             _ensure_column(cursor, "nome_relatorio", "VARCHAR(255) NULL")
+            _ensure_column(cursor, "acao_pendente", "VARCHAR(255) NULL")
+            _ensure_column(cursor, "data_ocorrencia", "VARCHAR(20) NULL")
             conn.commit()
         finally:
             cursor.close()
@@ -379,6 +381,8 @@ class EnvioRegistro(TypedDict, total=False):
     motivo_envio: Optional[str]
     nome_relatorio: Optional[str]
     data_envio: Optional[datetime]
+    acao_pendente: Optional[str]
+    data_ocorrencia: Optional[str]
 
 
 PreparedEnvio = Tuple[
@@ -386,6 +390,8 @@ PreparedEnvio = Tuple[
     str,
     str,
     str,
+    Optional[str],
+    Optional[str],
     Optional[str],
     Optional[str],
     Optional[str],
@@ -416,6 +422,8 @@ def _preparar_envios(envios: Sequence[EnvioRegistro]) -> List[PreparedEnvio]:
         status = _texto_obrigatorio(envio.get("status"), "status")
         pessoa = _texto_opcional(envio.get("pessoa"))
         motivo = _texto_opcional(envio.get("motivo_envio"))
+        acao_pendente = _texto_opcional(envio.get("acao_pendente"))
+        data_ocorrencia = _texto_opcional(envio.get("data_ocorrencia"))
         nome_relatorio_valor: Optional[str] = None
         nome_bruto = envio.get("nome_relatorio")
         if nome_bruto is not None:
@@ -440,6 +448,8 @@ def _preparar_envios(envios: Sequence[EnvioRegistro]) -> List[PreparedEnvio]:
             pessoa,
             motivo,
             nome_relatorio_valor,
+            acao_pendente,
+            data_ocorrencia,
         ))
     return registros
 
@@ -471,7 +481,8 @@ def _executar_load_data(cursor: MySQLCursor, arquivo: Path, local: bool) -> None
             chr(34),
             "' ",
             "LINES TERMINATED BY '\n' ",
-            "(data_envio, equipe, tipo_relatorio, status, pessoa, motivo_envio, nome_relatorio)",
+            "(data_envio, equipe, tipo_relatorio, status, pessoa, motivo_envio, nome_relatorio, "
+            "acao_pendente, data_ocorrencia)",
         ]
     )
     cursor.execute(sql)
@@ -589,8 +600,9 @@ def registrar_envio(
     )
     sql_insert = (
         "INSERT INTO envios "
-        "(data_envio, equipe, tipo_relatorio, status, pessoa, motivo_envio, nome_relatorio) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        "(data_envio, equipe, tipo_relatorio, status, pessoa, motivo_envio, nome_relatorio, "
+        "acao_pendente, data_ocorrencia) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
     )
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -722,3 +734,50 @@ def listar_equipes_disponiveis() -> List[str]:
         finally:
             cursor.close()
     return equipes
+
+
+def buscar_ocorrencias_enviadas(
+    tipo_relatorio: str,
+    chaves: Sequence[Tuple[str, str, str]],
+) -> set:
+    """Retorna quais ocorrencias ja foram enviadas com sucesso anteriormente.
+
+    Cada chave em ``chaves`` e uma tupla ``(pessoa, motivo_envio,
+    data_ocorrencia)``. O retorno e o subconjunto dessas chaves que ja possui
+    um envio com ``status = 'sucesso'`` registrado no historico para o
+    ``tipo_relatorio`` informado, independente do relatorio (nome de
+    arquivo) em que foram enviadas originalmente. Usado para evitar notificar
+    a mesma ocorrencia duas vezes quando relatorios com periodos sobrepostos
+    sao enviados em uploads diferentes.
+    """
+    chaves_normalizadas = {
+        (str(pessoa).strip(), str(motivo).strip(), str(data).strip())
+        for pessoa, motivo, data in chaves
+        if str(pessoa).strip() and str(motivo).strip() and str(data).strip()
+    }
+    if not chaves_normalizadas:
+        return set()
+
+    init_db()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                (
+                    "SELECT DISTINCT pessoa, motivo_envio, data_ocorrencia FROM envios "
+                    "WHERE tipo_relatorio = %s AND status = 'sucesso' "
+                    "AND data_ocorrencia IS NOT NULL AND data_ocorrencia <> ''"
+                ),
+                (tipo_relatorio,),
+            )
+            existentes = {
+                (str(pessoa or "").strip(), str(motivo or "").strip(), str(data or "").strip())
+                for pessoa, motivo, data in cursor.fetchall()
+            }
+        except MySQLError as exc:  # noqa: BLE001
+            logging.error("Erro ao consultar ocorrencias ja enviadas: %s", exc)
+            raise
+        finally:
+            cursor.close()
+
+    return chaves_normalizadas & existentes

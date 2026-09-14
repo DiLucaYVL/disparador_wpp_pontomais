@@ -3,7 +3,19 @@ from typing import List, Optional
 import pandas as pd
 from app.types import MensagemDetalhada
 
-from .motivos_ocorrencias import validar_motivo
+from .motivos_ocorrencias import validar_motivo, eh_pendencia_gestor
+
+
+def filtrar_pendencia_gestor(df: pd.DataFrame) -> pd.DataFrame:
+    """Retorna apenas as linhas cuja 'Ação pendente' depende do gestor.
+
+    Usado pelo checkbox "Enviar apenas pendências do gestor" (relatório de
+    Ocorrências): ocorrências que dependem do colaborador (ex.: "Colaborador
+    solicitar ajuste") não devem gerar mensagem nem ser registradas.
+    """
+    if df.empty or "Ação pendente" not in df.columns:
+        return df
+    return df[df["Ação pendente"].apply(eh_pendencia_gestor)]
 
 
 def processar_ocorrencias(df: pd.DataFrame) -> pd.Series:

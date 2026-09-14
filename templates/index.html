@@ -106,6 +106,11 @@
                         <label for="debugMode">Modo debug (desenvolvedores)</label>
                     </div>
 
+                    <div class="checkbox-container hidden" id="apenasGestorContainer">
+                        <input type="checkbox" id="apenasGestor" />
+                        <label for="apenasGestor">Enviar apenas ajustes pendentes de aprovação do gestor</label>
+                    </div>
+
                     <div class="tipo-relatorio-container">
                         <label for="tipoRelatorio">📊 Tipo de Relatório:</label>
                         <div class="tipo-dropdown-container">
@@ -234,18 +239,45 @@
     </div>
 
 
-    <div id="modalOverlay" class="modal-overlay hidden"></div>
-    <div id="confirmReenvioModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmReenvioTitulo">
-        <div class="modal-content">
-            <h4 id="confirmReenvioTitulo">Confirmar reenvio</h4>
-            <p>Esse relatorio ja foi enviado anteriormente. Se voce refizer o envio, podera enviar mensagens que ja foram enviadas antes.</p>
-            <div class="modal-actions">
-                <button type="button" id="confirmReenvioCancelar" class="modal-button modal-button--secondary">Cancelar</button>
-                <button type="button" id="confirmReenvioConfirmar" class="modal-button modal-button--primary">Reenviar mesmo assim</button>
-            </div>
-        </div>
-    </div>
-
+    <div id="modalOverlay" class="modal-overlay hidden"></div>
+    <div id="confirmReenvioModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmReenvioTitulo">
+        <div class="modal-content">
+            <h4 id="confirmReenvioTitulo">Confirmar reenvio</h4>
+            <p>Esse relatorio ja foi enviado anteriormente. Se voce refizer o envio, podera enviar mensagens que ja foram enviadas antes.</p>
+            <div class="modal-actions">
+                <button type="button" id="confirmReenvioCancelar" class="modal-button modal-button--secondary">Cancelar</button>
+                <button type="button" id="confirmReenvioConfirmar" class="modal-button modal-button--primary">Reenviar mesmo assim</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmSelecaoArquivoModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmSelecaoArquivoTitulo">
+        <div class="modal-content">
+            <h4 id="confirmSelecaoArquivoTitulo">Confirmar envio de Ocorrências</h4>
+            <p>Revise a opção abaixo antes de processar o arquivo:</p>
+            <div class="checkbox-container">
+                <input type="checkbox" id="confirmSelecaoApenasGestor" />
+                <label for="confirmSelecaoApenasGestor">Enviar apenas ajustes pendentes de aprovação do gestor</label>
+            </div>
+            <p>Se marcado, ocorrências pendentes do colaborador não serão enviadas nem registradas no histórico.</p>
+            <div class="modal-actions">
+                <button type="button" id="confirmSelecaoCancelar" class="modal-button modal-button--secondary">Cancelar</button>
+                <button type="button" id="confirmSelecaoContinuar" class="modal-button modal-button--primary">Continuar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmDuplicidadeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmDuplicidadeTitulo">
+        <div class="modal-content">
+            <h4 id="confirmDuplicidadeTitulo">Ocorrências já enviadas antes</h4>
+            <p id="confirmDuplicidadeTexto">Algumas ocorrências deste relatório já foram enviadas anteriormente (em outro upload). O que deseja fazer?</p>
+            <div class="modal-actions">
+                <button type="button" id="confirmDuplicidadeApenasNovas" class="modal-button modal-button--secondary">Enviar apenas as novas</button>
+                <button type="button" id="confirmDuplicidadeTodas" class="modal-button modal-button--primary">Enviar todas mesmo assim</button>
+            </div>
+        </div>
+    </div>
+
 <!-- Scripts -->
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/api.js') }}"></script>

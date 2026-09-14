@@ -1,4 +1,6 @@
 from app.processamento.csv_reader import carregar_dados
+from app.processamento.ocorrencias_processor import filtrar_pendencia_gestor
+from app.processamento.motivos_ocorrencias import ACAO_PENDENTE_GESTOR
 from app.whatsapp.mensagem import gerar_mensagens
 from app.whatsapp.mensagem_assinaturas import gerar_mensagens_assinaturas
 from app.routes import enviar_whatsapp
@@ -6,6 +8,7 @@ from app.history import (
     registrar_envio,
     registrar_resultado_relatorio,
     normalizar_nome_relatorio,
+    buscar_ocorrencias_enviadas,
 )
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.whatsapp.numeros_equipes import carregar_numeros_equipes
@@ -26,6 +29,8 @@ def processar_csv(
     nome_relatorio=None,
     nome_relatorio_original=None,
     equipes_permitidas=None,
+    apenas_gestor=False,
+    incluir_duplicadas=False,
 ):
     nome_arquivo_log = configurar_log()
     logging.info(f">>> Iniciando processamento CSV: {caminho_csv}")
@@ -51,6 +56,47 @@ def processar_csv(
     logs = []
     equipes_sem_numero = []
     stats = {"total": 0, "equipes": set(), "sucesso": 0, "erro": 0}
+
+    ignoradas_pendencia_colaborador = 0
+    ignoradas_duplicadas = 0
+    acao_pendente_valor = ACAO_PENDENTE_GESTOR if (tipo_relatorio == "Ocorrências" and apenas_gestor) else None
+
+    if tipo_relatorio == "Ocorrências":
+        if apenas_gestor:
+            total_antes = len(df)
+            df = filtrar_pendencia_gestor(df)
+            ignoradas_pendencia_colaborador = total_antes - len(df)
+            if ignoradas_pendencia_colaborador:
+                logs.append({
+                    "type": "info",
+                    "message": (
+                        f"{ignoradas_pendencia_colaborador} ocorrência(s) ignorada(s): "
+                        "pendência é do colaborador, não do gestor."
+                    ),
+                })
+
+        if not incluir_duplicadas and not df.empty:
+            candidatos = list(df[["Nome", "Motivo", "Data"]].itertuples(index=False, name=None))
+            ja_enviadas = buscar_ocorrencias_enviadas("Ocorrências", candidatos)
+            if ja_enviadas:
+                mask_duplicada = df.apply(
+                    lambda row: (
+                        str(row["Nome"]).strip(),
+                        str(row["Motivo"]).strip(),
+                        str(row["Data"]).strip(),
+                    ) in ja_enviadas,
+                    axis=1,
+                )
+                ignoradas_duplicadas = int(mask_duplicada.sum())
+                df = df[~mask_duplicada]
+                if ignoradas_duplicadas:
+                    logs.append({
+                        "type": "info",
+                        "message": (
+                            f"{ignoradas_duplicadas} ocorrência(s) ignorada(s): "
+                            "já haviam sido enviadas anteriormente."
+                        ),
+                    })
 
     nome_relatorio_chave = normalizar_nome_relatorio(nome_relatorio or nome_relatorio_original)
     nome_relatorio_exibicao = (nome_relatorio_original or nome_relatorio or nome_relatorio_chave or "relatorio_sem_nome").strip()
@@ -201,7 +247,7 @@ def processar_csv(
 
             if nome_formatado:
                 motivo_texto = "; ".join(motivos_unicos) or "Motivo não informado"
-                historico_por_equipe[equipe].append((nome_formatado, motivo_texto))
+                historico_por_equipe[equipe].append((nome_formatado, motivo_texto, str(data)))
 
         if not equipes_previstas_norm:
             equipes_previstas_norm = {
@@ -278,8 +324,10 @@ def processar_csv(
                             "pessoa": pessoa,
                             "motivo_envio": motivo,
                             "nome_relatorio": nome_relatorio_chave,
+                            "acao_pendente": acao_pendente_valor,
+                            "data_ocorrencia": data_ocorrencia,
                         }
-                        for pessoa, motivo in registros
+                        for pessoa, motivo, data_ocorrencia in registros
                     ]
                     registrar_envio(envios_lote)
             except Exception as e:
@@ -295,8 +343,10 @@ def processar_csv(
                             "pessoa": pessoa,
                             "motivo_envio": motivo,
                             "nome_relatorio": nome_relatorio_chave,
+                            "acao_pendente": acao_pendente_valor,
+                            "data_ocorrencia": data_ocorrencia,
                         }
-                        for pessoa, motivo in registros
+                        for pessoa, motivo, data_ocorrencia in registros
                     ]
                     registrar_envio(envios_lote)
 
@@ -358,6 +408,8 @@ def processar_csv(
     stats["total"] = max(stats["sucesso"] + stats["erro"], total_equipes_previstas)
     stats["equipes"] = total_equipes_previstas
     stats["pendencias"] = len(equipes_com_erro)
+    stats["ignoradas_pendencia_colaborador"] = ignoradas_pendencia_colaborador
+    stats["ignoradas_duplicadas"] = ignoradas_duplicadas
 
     if nome_relatorio_chave:
         registrar_resultado_relatorio(

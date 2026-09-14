@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoDropdownItems = document.querySelectorAll('.tipo-dropdown-item');
     const ignorarSabadosCheckbox = document.getElementById('ignorarSabados');
     const ignorarSabadosLabel = document.querySelector('label[for="ignorarSabados"]');
+    const apenasGestorContainer = document.getElementById('apenasGestorContainer');
+    const apenasGestorCheckbox = document.getElementById('apenasGestor');
 
     // Toggle dropdown
     tipoDropdownHeader.addEventListener('click', function() {
@@ -67,6 +69,18 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 ignorarSabadosCheckbox.disabled = false;
                 ignorarSabadosLabel.classList.remove('upload-disabled');
+            }
+
+            // Checkbox "apenas pendências do gestor" só faz sentido para Ocorrências
+            if (apenasGestorContainer) {
+                if (value === 'Ocorrências') {
+                    apenasGestorContainer.classList.remove('hidden');
+                } else {
+                    apenasGestorContainer.classList.add('hidden');
+                    if (apenasGestorCheckbox) {
+                        apenasGestorCheckbox.checked = false;
+                    }
+                }
             }
         });
     });

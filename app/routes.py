@@ -12,6 +12,7 @@ import requests
 from urllib.parse import urljoin
 from app.processamento.mapear_gerencia import mapear_equipe
 from app.processamento.csv_reader import carregar_dados
+from app.processamento.ocorrencias_processor import filtrar_pendencia_gestor
 from app.config.settings import (
     EVOLUTION_INSTANCE,
     EVOLUTION_TOKEN,
@@ -22,6 +23,7 @@ from app.history import (
     listar_equipes_disponiveis,
     normalizar_nome_relatorio,
     obter_status_relatorio,
+    buscar_ocorrencias_enviadas,
     STATUS_SUCESSO_TOTAL,
     STATUS_ENVIO_PARCIAL,
 )
@@ -234,6 +236,8 @@ def enviar():
 
         debug_mode = request.form.get('debugMode', 'false') == 'true'
         forcar_reenvio = request.form.get('forcarReenvio', 'false').lower() == 'true'
+        apenas_gestor = request.form.get('apenasGestor', 'false').lower() == 'true'
+        incluir_duplicadas = request.form.get('incluirDuplicadas', 'false').lower() == 'true'
 
         if not file:
             return jsonify({"success": False, "log": ["⚠️ Nenhum arquivo CSV enviado."]}), 400
@@ -304,6 +308,8 @@ def enviar():
             nome_relatorio=nome_relatorio_normalizado,
             nome_relatorio_original=nome_relatorio_original,
             equipes_permitidas=equipes_permitidas,
+            apenas_gestor=apenas_gestor,
+            incluir_duplicadas=incluir_duplicadas,
         )
 
         return jsonify({
@@ -378,6 +384,7 @@ def obter_equipes():
     file = request.files.get('csvFile')
     ignorar_sabados = request.form.get('ignorarSabados', 'true') == 'true'
     tipo_relatorio = request.form.get('tipoRelatorio', 'Auditoria')
+    apenas_gestor = request.form.get('apenasGestor', 'false').lower() == 'true'
     if tipo_relatorio not in {"Auditoria", "Ocorrências", "Assinaturas"}:
         return jsonify({
             "success": False,
@@ -395,13 +402,40 @@ def obter_equipes():
     try:
         df = carregar_dados(filepath, ignorar_sabados, tipo_relatorio)
 
+        duplicidade = None
+        if tipo_relatorio == "Ocorrências":
+            if apenas_gestor:
+                df = filtrar_pendencia_gestor(df)
+
+            if df.empty:
+                duplicidade = {"duplicadas": 0, "novas": 0}
+            else:
+                candidatos = list(df[["Nome", "Motivo", "Data"]].itertuples(index=False, name=None))
+                ja_enviadas = buscar_ocorrencias_enviadas("Ocorrências", candidatos)
+                if ja_enviadas:
+                    mask_duplicada = df.apply(
+                        lambda row: (
+                            str(row["Nome"]).strip(),
+                            str(row["Motivo"]).strip(),
+                            str(row["Data"]).strip(),
+                        ) in ja_enviadas,
+                        axis=1,
+                    )
+                    qtd_duplicadas = int(mask_duplicada.sum())
+                else:
+                    qtd_duplicadas = 0
+                duplicidade = {"duplicadas": qtd_duplicadas, "novas": len(df) - qtd_duplicadas}
+
         df['EquipeTratada'] = df['Equipe'].apply(mapear_equipe)
 
         equipes = sorted(df['EquipeTratada'].dropna().unique().tolist())
         logging.info(f"Equipes extraídas: {len(equipes)}")
 
-        return jsonify({"success": True, "equipes": equipes})
-    
+        resposta = {"success": True, "equipes": equipes}
+        if duplicidade is not None:
+            resposta["duplicidade"] = duplicidade
+        return jsonify(resposta)
+
     except Exception as e:
         logging.exception("Erro ao processar CSV para extração de equipes.")
         return jsonify({"success": False, "error": str(e)}), 500

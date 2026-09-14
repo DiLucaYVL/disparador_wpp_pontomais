@@ -12,6 +12,10 @@ ACOES_PENDENTES = {
     "Gestor corrigir lançamento de exceção": "Gestor corrigir lançamento de exceção"
 }
 
+# Única ação pendente considerada "pendência do gestor" para fins de envio
+# filtrado (checkbox "Enviar apenas pendências do gestor" no frontend).
+ACAO_PENDENTE_GESTOR = "Gestor aprovar solicitação de ajuste"
+
 def validar_motivo(motivo):
     """Valida se o motivo está na lista de motivos válidos"""
     return motivo in MOTIVOS_OCORRENCIAS
@@ -19,6 +23,10 @@ def validar_motivo(motivo):
 def validar_acao_pendente(acao):
     """Valida se a ação pendente está na lista de ações válidas"""
     return acao in ACOES_PENDENTES
+
+def eh_pendencia_gestor(acao):
+    """Indica se a ação pendente informada depende de aprovação do gestor"""
+    return str(acao).strip() == ACAO_PENDENTE_GESTOR
 
 def obter_motivos_validos():
     """Retorna a lista de motivos válidos"""

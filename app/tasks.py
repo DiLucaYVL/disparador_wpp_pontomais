@@ -94,6 +94,8 @@ def enqueue_csv_processing(
     nome_relatorio: Optional[str] = None,
     nome_relatorio_original: Optional[str] = None,
     equipes_permitidas: Optional[set] = None,
+    apenas_gestor: bool = False,
+    incluir_duplicadas: bool = False,
 ) -> str:
     """Agenda o processamento do CSV em background."""
     task_id = uuid.uuid4().hex
@@ -121,6 +123,8 @@ def enqueue_csv_processing(
                 nome_relatorio=nome_relatorio,
                 nome_relatorio_original=nome_relatorio_original,
                 equipes_permitidas=equipes_permitidas,
+                apenas_gestor=apenas_gestor,
+                incluir_duplicadas=incluir_duplicadas,
             )
 
             debug_data = None
