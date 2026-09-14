@@ -16,7 +16,7 @@ TEMPLATES = {
     "Horas Faltantes": "*{nome}* ficou devendo *{horas}*. Por favor *justificar*.",
     "Interjornada insuficiente": "*{nome}* teve interjornada (período mínimo de descanso entre um expediente e outro) menor que 11h. _Tempo registrado_: *{horas}*.",
     "Intrajornada insuficiente": "*{nome}* teve pausa de almoço menor que 1h. _Tempo registrado_: *{horas}*.",
-    "Horas extras": "*{nome}* fez mais de 2 horas extras. _Total_: *{valor}*. Por favor *ajustar*."
+    "Horas extras": "*{nome}* fez *{horas_extras} extras*. Por favor *ajustar*."
 }
 
 # === Funções auxiliares ===
@@ -45,6 +45,28 @@ def formatar_horas(valor):
     if m == 0:
         return f"{horas}:{minutos} horas"
     return f"{horas}:{minutos} horas"
+
+def formatar_horas_extras(valor):
+    """Formata minutos extras em texto dinâmico, com singular/plural correto.
+
+    Exemplos: "00:37" -> "37 minutos"; "02:00" -> "2 horas";
+    "02:15" -> "2 horas e 15 minutos"; "01:00" -> "1 hora".
+    """
+    if not isinstance(valor, str) or ":" not in valor:
+        return valor
+    try:
+        horas_str, minutos_str = valor.strip().split(":")
+        h, m = int(horas_str), int(minutos_str)
+    except ValueError:
+        return valor
+
+    partes = []
+    if h > 0:
+        partes.append(f"{h} hora" + ("s" if h != 1 else ""))
+    if m > 0:
+        partes.append(f"{m} minuto" + ("s" if m != 1 else ""))
+
+    return " e ".join(partes) if partes else "0 minutos"
 
 def normalizar(texto):
     if not isinstance(texto, str):
@@ -118,9 +140,9 @@ def gerar_mensagem(grupo) -> Optional[MensagemDetalhada]:
         if ocorr_norm == "horas extras":
             try:
                 h, m = map(int, valor.strip().split(":"))
-                if h * 60 + m < 120:
-                    continue
-            except:
+            except Exception:
+                continue
+            if h == 0 and m == 0:
                 continue
 
         tpl = TEMPLATES.get(ocorr.strip())
@@ -131,7 +153,8 @@ def gerar_mensagem(grupo) -> Optional[MensagemDetalhada]:
             nome=nome,
             data=data,
             valor=valor,
-            horas=formatar_horas(valor)
+            horas=formatar_horas(valor),
+            horas_extras=formatar_horas_extras(valor),
         ).strip()
 
         if msg and msg not in mensagens_set:
