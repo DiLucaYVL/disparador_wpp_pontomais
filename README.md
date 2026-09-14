@@ -11,6 +11,7 @@
 - [Arquitetura](#arquitetura)
 - [Instalação](#instalação)
 - [Integração com Google Sheets](#integração-com-google-sheets)
+- [Números de WhatsApp por Equipe](#números-de-whatsapp-por-equipe)
 - [Uso](#uso)
 
 ## Descrição
@@ -67,7 +68,7 @@ O sistema está operacional e sendo usado ativamente pela TopFama para gestão d
 
 ### Integração
 - **Evolution API** - Gateway WhatsApp
-- **SMTP** - Envio de logs por email
+- **SMTP** - Utilitário para envio de log de erro por e-mail (`app/services/email_sender.py`, não acionado automaticamente pelo fluxo atual)
 - **Google Sheets API** - Gravação de dados processados em planilha (opcional)
 - **MySQL** - Histórico de envios por equipe/relatório
 
@@ -107,11 +108,14 @@ graph TB
 ### Fluxo Principal:
 1. **Upload**: Interface recebe arquivo CSV via drag-and-drop ou seleção
 2. **Enfileiramento**: A rota `/enviar` salva o arquivo e agenda a tarefa com `ThreadPoolExecutor`
-3. **Polling**: O frontend consulta `/status/<task_id>` até o processamento terminar
-4. **Mapeamento**: Equipes são categorizadas (CD, Lojas, Departamentos)
-5. **Mensagens**: Templates personalizados por tipo de ocorrência
-6. **Envio**: Integração com Evolution API para WhatsApp
-7. **Histórico**: Registros gravados no MySQL com status de sucesso/erro
+3. **Verificação de sessão**: Antes de processar, a tarefa confirma que a instância do WhatsApp está com status `open` na Evolution API; caso contrário, a tarefa termina em erro
+4. **Polling**: O frontend consulta `/status/<task_id>` até o processamento terminar
+5. **Mapeamento**: Equipes são categorizadas (CD, Lojas, Departamentos)
+6. **Mensagens**: Templates personalizados por tipo de ocorrência
+7. **Envio**: Integração com Evolution API para WhatsApp
+8. **Histórico**: Registros gravados no MySQL com status de sucesso/erro (tabelas `envios`, `relatorios` e `relatorio_pendencias`)
+
+> **Reconexão automática**: se a instância permanecer no estado `connecting` por mais de 60 segundos, `verificar_sessao()` (em `app/routes.py`) força um logout na Evolution API para que o status volte a `close` e a interface possa reconectar via QR Code.
 
 ### Componentes Principais:
 - `app/routes.py` — Blueprint Flask com todos os endpoints da API
@@ -120,13 +124,15 @@ graph TB
 - `app/processamento/csv_reader.py` — Parser para relatórios de Auditoria
 - `app/processamento/csv_reader_ocorrencias.py` — Parser para relatórios de Ocorrências
 - `app/processamento/csv_reader_assinaturas.py` — Parser para relatórios de Assinaturas
-- `app/whatsapp/mensagem.py` — Templates e geração de mensagens (Auditoria/Ocorrências)
+- `app/processamento/ocorrencias_processor.py` — Geração de mensagens para relatórios de Ocorrências (chamado por `mensagem.py`) e filtro `filtrar_pendencia_gestor` (checkbox "Enviar apenas ajustes pendentes de aprovação do gestor")
+- `app/history.py` também expõe `buscar_ocorrencias_enviadas`, usada para detectar ocorrências (pessoa+data+motivo) já enviadas em relatórios anteriores e evitar duplicidade
+- `app/whatsapp/mensagem.py` — Templates e geração de mensagens de Auditoria; despacha para `ocorrencias_processor.py` quando o tipo é Ocorrências
 - `app/whatsapp/mensagem_assinaturas.py` — Templates para relatórios de Assinaturas
-- `app/whatsapp/numeros_equipes.py` — Resolução de número de WhatsApp por equipe
+- `app/whatsapp/numeros_equipes.py` — Resolução de número de WhatsApp por equipe, lendo a planilha configurada em `PLANILHA_EQUIPES_*`
 - `app/history.py` — Leitura e gravação do histórico de envios (MySQL)
 - `app/history_export.py` — Exportação do histórico para planilha Excel
 - `app/services/google_sheets.py` — Integração com Google Sheets
-- `app/services/email_sender.py` — Envio de logs por SMTP
+- `app/services/email_sender.py` — Utilitário para notificar erro crítico por e-mail com o log anexado; não é chamado automaticamente pelo fluxo atual (disponível para uso manual/futuro)
 - `app/config/settings.py` — Leitura centralizada das variáveis de ambiente
 </details>
 
@@ -168,16 +174,40 @@ cp .env.example .env
 
 Exemplo de `.env`:
 ```env
+# Evolution API (gateway WhatsApp)
 EVOLUTION_URL=http://localhost:8080
 EVOLUTION_INSTANCE=seu-instance
 EVOLUTION_TOKEN=seu-token
 
+# Planilha de números de equipes (ver seção "Números de WhatsApp por Equipe")
+PLANILHA_EQUIPES_URL=
+PLANILHA_EQUIPES_SHEET_ID=
+PLANILHA_EQUIPES_WORKSHEET=
+PLANILHA_EQUIPES_GID=
+
+# Banco de dados MySQL (histórico de envios)
 DB_HOST=192.168.99.50
 DB_PORT=3306
 DB_NAME=enviodp
 DB_USER=seu-usuario
 DB_PASSWORD=sua-senha
+
+# Google Sheets (opcional — grava o DataFrame processado em planilha)
+GOOGLE_SHEETS_ENABLED=false
+GOOGLE_SHEETS_SPREADSHEET_ID=
+GOOGLE_SHEETS_WORKSHEET=Dados
+GOOGLE_SHEETS_CREDENTIALS_FILE=
+GOOGLE_SHEETS_CREDENTIALS_JSON=
+
+# E-mail (opcional — utilitário para notificar erro crítico com log anexado)
+EMAIL_USER=
+EMAIL_PASS=
+EMAIL_TO=
+EMAIL_HOST=
+EMAIL_PORT=
 ```
+
+> Consulte [.env.example](.env.example) para a lista completa e comentada de variáveis.
 
 5. **Execute localmente:**
 ```bash
@@ -201,7 +231,7 @@ docker run -d \
   -v disparador_uploads:/app/uploads \
   -v disparador_logs:/app/log \
   -v disparador_task_status:/app/task_status \
-  -v disparador_secrets:/app/secrets \
+  -v ./secrets:/app/secrets:ro \
   topfama-disparador
 ```
 
@@ -280,6 +310,15 @@ server {
 
 Pronto: ao subir um novo CSV pela interface, as linhas processadas serão copiadas para o Google Sheets escolhido.
 
+## Números de WhatsApp por Equipe
+
+O número de WhatsApp de cada equipe/loja (para onde as mensagens são enviadas) é resolvido em tempo real por `app/whatsapp/numeros_equipes.py`, a partir de uma planilha com duas colunas (`Equipe`, `Numero`). A fonte é escolhida na seguinte ordem:
+
+1. **CSV público** — se `PLANILHA_EQUIPES_URL` estiver definida, o sistema tenta ler a planilha diretamente por essa URL (ex.: link de exportação CSV do Google Sheets). É o caminho mais rápido e não exige credenciais.
+2. **Google Sheets API (fallback)** — se a leitura via CSV falhar (ou a URL não estiver definida), o sistema usa a mesma *service account* configurada para `GOOGLE_SHEETS_CREDENTIALS_FILE`/`GOOGLE_SHEETS_CREDENTIALS_JSON` e abre a planilha pelo `PLANILHA_EQUIPES_SHEET_ID`. Nesse caso, use `PLANILHA_EQUIPES_WORKSHEET` para indicar a aba pelo nome ou `PLANILHA_EQUIPES_GID` para indicar pelo `gid` da aba (a URL também pode conter o `gid`, extraído automaticamente).
+
+Números brasileiros são normalizados automaticamente (remoção de `+55`/`0055`, remoção do 9º dígito quando aplicável) para o formato aceito pela Evolution API.
+
 ## Uso
 
 ### 1. Conectar WhatsApp
@@ -306,9 +345,18 @@ Faça upload do arquivo CSV gerado pelo PontoMais:
   "tipoRelatorio": "Auditoria",  // "Auditoria", "Ocorrências" ou "Assinaturas"
   "equipesSelecionadas": ["CD10", "LOJA 75", "RH"],  // Filtros opcionais
   "debugMode": false,            // Retorna o DataFrame parsed no resultado
-  "forcarReenvio": false         // Força reenvio de relatório já concluído
+  "forcarReenvio": false,        // Força reenvio de relatório já concluído
+  "apenasGestor": false,         // Só relatório "Ocorrências": envia/registra apenas
+                                  // linhas com Ação pendente = "Gestor aprovar solicitação
+                                  // de ajuste" (ignora pendências do colaborador)
+  "incluirDuplicadas": false     // Só relatório "Ocorrências" com apenasGestor ativo: se
+                                  // false, ocorrências (mesma pessoa+data+motivo) já
+                                  // enviadas com sucesso em qualquer upload anterior são
+                                  // puladas; o frontend pergunta ao usuário antes de enviar
 }
 ```
+
+> O filtro "Enviar apenas ajustes pendentes de aprovação do gestor" e a checagem de duplicidade se aplicam somente ao relatório **Ocorrências** (que tem a coluna `Ação pendente`) — o relatório Auditoria não possui esse dado e não é afetado. Ao selecionar o arquivo CSV, a interface avisa se o checkbox está marcado ou não e pede confirmação antes de processar.
 
 ### 4. Processamento Assíncrono
 
@@ -326,7 +374,7 @@ GET  /status/{id}   → { status: "queued" | "running" | "done" | "error", log, 
 
 *NO DIA 15/01/2024:*
 • João Silva faltou. Por favor justificar.
-• Maria Santos fez mais de 2 horas extras. Total: 03:15. Por favor ajustar.
+• Maria Santos fez 3 horas e 15 minutos extras. Por favor ajustar.
 
 *NO DIA 16/01/2024:*
 • Carlos Oliveira ficou devendo 02:30 horas. Por favor justificar.
@@ -345,12 +393,14 @@ GET /config
 # Extrair equipes disponíveis no CSV
 POST /equipes
 Content-Type: multipart/form-data
-{ csvFile, ignorarSabados, tipoRelatorio }
+{ csvFile, ignorarSabados, tipoRelatorio, apenasGestor }
+→ { success, equipes: string[], duplicidade?: { novas, duplicadas } }
+  # "duplicidade" só é retornado quando tipoRelatorio = "Ocorrências"
 
 # Enviar relatório (agendamento assíncrono)
 POST /enviar
 Content-Type: multipart/form-data
-{ csvFile, ignorarSabados, tipoRelatorio, equipesSelecionadas, debugMode, forcarReenvio }
+{ csvFile, ignorarSabados, tipoRelatorio, equipesSelecionadas, debugMode, forcarReenvio, apenasGestor, incluirDuplicadas }
 → HTTP 202 { success, task_id, message }
 → HTTP 409 { code: "relatorio_concluido" | "relatorio_sem_pendencias" }
 
@@ -360,11 +410,11 @@ GET /status/<task_id>
 
 # Consultar status de um relatório pelo nome
 GET /relatorios/status?nome=<nome_relatorio>
-→ { status: "novo"|"sucesso_total"|"envio_parcial", relatorio }
+→ { status: "novo"|"sucesso_total"|"parcial", relatorio }
 
 # Status do WhatsApp
 GET /whatsapp/status
-→ { status, connected }
+→ { success, connected, status, state }
 
 # Obter QR Code para conexão
 GET /whatsapp/qr
@@ -392,14 +442,19 @@ GET /historico/exportar?equipes=&tipos=&inicio=&fim=
 # Edite app/whatsapp/mensagem.py para personalizar templates de Auditoria:
 
 TEMPLATES = {
+    "Mais de 6 dias de trabalho consecutivos": "*{nome}* está com mais de 6 dias consecutivos de trabalho. O colaborador deve *pegar folga* na semana seguinte.",
     "Falta": "*{nome}* _faltou_. Por favor *justificar*.",
     "Horas Faltantes": "*{nome}* ficou devendo *{horas}*. Por favor *justificar*.",
-    "Horas extras": "*{nome}* fez mais de 2 horas extras. _Total_: *{valor}*. Por favor *ajustar*.",
-    "Interjornada insuficiente": "*{nome}* teve interjornada menor que 11h. _Tempo registrado_: *{horas}*.",
+    "Interjornada insuficiente": "*{nome}* teve interjornada (período mínimo de descanso entre um expediente e outro) menor que 11h. _Tempo registrado_: *{horas}*.",
     "Intrajornada insuficiente": "*{nome}* teve pausa de almoço menor que 1h. _Tempo registrado_: *{horas}*.",
-    "Mais de 6 dias de trabalho consecutivos": "*{nome}* está com mais de 6 dias consecutivos de trabalho. O colaborador deve *pegar folga* na semana seguinte.",
+    "Horas extras": "*{nome}* fez *{horas_extras} extras*. Por favor *ajustar*."
     # Adicione novos templates conforme necessário
 }
 
+# {horas_extras} é formatado dinamicamente (singular/plural) por formatar_horas_extras():
+#   "00:05" -> "5 minutos" | "01:00" -> "1 hora" | "02:15" -> "2 horas e 15 minutos"
+# Toda ocorrência de "Horas extras" é enviada, sem corte mínimo (exceto 00:00, que é ignorado).
+
+# Para mensagens de Ocorrências, edite app/processamento/ocorrencias_processor.py
 # Para mensagens de Assinaturas, edite app/whatsapp/mensagem_assinaturas.py
 ```

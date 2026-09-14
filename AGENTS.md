@@ -42,14 +42,28 @@ disparador_wpp_pontomais/
 │   │   └── numeros_equipes.py   # Resolução do número WPP por equipe
 │   └── services/
 │       ├── google_sheets.py     # Integração Google Sheets API
-│       └── email_sender.py      # Envio de logs via SMTP
+│       └── email_sender.py      # Utilitário de envio de log por SMTP (não é chamado automaticamente pelo fluxo atual)
 ├── templates/                   # Templates Jinja2 (index.html, historico.html)
 ├── static/                      # Assets estáticos (JS, CSS)
+├── tests/                       # Suíte de testes automatizados (pytest)
+├── teste/                       # CSVs de exemplo para testes manuais (não é a suíte pytest)
 ├── uploads/                     # CSVs temporários (limpos após processamento)
 ├── log/                         # Arquivos de log de execução
 ├── task_status/                 # JSONs de status das tarefas assíncronas
 └── secrets/                     # Credenciais (montado como volume read-only)
 ```
+
+## Variáveis de ambiente (`.env`)
+
+| Grupo | Variáveis | Uso |
+|-------|-----------|-----|
+| Evolution API | `EVOLUTION_URL`, `EVOLUTION_INSTANCE`, `EVOLUTION_TOKEN` | Conexão e envio de mensagens via `app/config/settings.py` / `app/routes.py` |
+| Planilha de equipes | `PLANILHA_EQUIPES_URL`, `PLANILHA_EQUIPES_SHEET_ID`, `PLANILHA_EQUIPES_WORKSHEET`, `PLANILHA_EQUIPES_GID` | Resolução do número de WhatsApp por equipe em `app/whatsapp/numeros_equipes.py` (CSV público, com fallback via Google Sheets API) |
+| Banco de dados | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Histórico de envios (MySQL) em `app/history.py` |
+| Google Sheets | `GOOGLE_SHEETS_ENABLED`, `GOOGLE_SHEETS_SPREADSHEET_ID`, `GOOGLE_SHEETS_WORKSHEET`, `GOOGLE_SHEETS_CREDENTIALS_FILE`, `GOOGLE_SHEETS_CREDENTIALS_JSON` | Gravação opcional do DataFrame processado em `app/services/google_sheets.py` |
+| E-mail (opcional) | `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_TO`, `EMAIL_HOST`, `EMAIL_PORT` | Usadas por `app/services/email_sender.py`, que hoje não é chamado por nenhuma rota ou tarefa |
+
+Nunca versione `.env`; use `.env.example` como referência dos nomes.
 
 ## Tipos de relatório suportados
 
@@ -58,6 +72,8 @@ disparador_wpp_pontomais/
 | Auditoria    | `csv_reader.py`                 | `mensagem.py` (TEMPLATES)     |
 | Ocorrências  | `csv_reader_ocorrencias.py`     | `ocorrencias_processor.py`    |
 | Assinaturas  | `csv_reader_assinaturas.py`     | `mensagem_assinaturas.py`     |
+
+Para Ocorrências, o checkbox "Enviar apenas ajustes pendentes de aprovação do gestor" (frontend) aplica `filtrar_pendencia_gestor()` — só envia/registra linhas com `Ação pendente = "Gestor aprovar solicitação de ajuste"`. Quando ativo, `history.buscar_ocorrencias_enviadas()` também é usada para pular ocorrências (mesma pessoa+data+motivo) já enviadas com sucesso em um upload anterior, a menos que o usuário confirme o reenvio no modal de duplicidade. Ao selecionar o arquivo CSV (evento `change` do input), o frontend (`eventos.js:confirmarSelecaoArquivo`) avisa se esse checkbox está marcado ou não e pede confirmação antes de processar o CSV.
 
 ## Diretrizes de desenvolvimento
 
