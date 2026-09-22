@@ -63,3 +63,31 @@ def test_gerar_mensagem_ignora_zero_horas_extras():
 def test_gerar_mensagem_ignora_valor_invalido():
     resultado = gerar_mensagem(_grupo_horas_extras("invalido"))
     assert resultado is None
+
+
+def _grupo_intervalo(valor):
+    return pd.DataFrame([
+        {
+            "Nome": "Fulano",
+            "Data": "10/11/2025",
+            "Ocorrência": "Mais de 2 horas de intervalo",
+            "Valor": valor,
+            "FaltaAbonadaJustificada": False,
+        }
+    ])
+
+
+def test_gerar_mensagem_mais_de_2_horas_intervalo():
+    resultado = gerar_mensagem(_grupo_intervalo("02:01"))
+    assert resultado is not None
+    assert "2 horas e 1 minuto" in resultado.texto
+    assert "Fulano" in resultado.texto
+    assert "Mais de 2 horas de intervalo" in resultado.motivos
+
+
+def test_gerar_mensagem_mais_de_2_horas_intervalo_redondo():
+    resultado = gerar_mensagem(_grupo_intervalo("02:00"))
+    assert resultado is not None
+    assert "2 horas" in resultado.texto
+    assert "Fulano" in resultado.texto
+

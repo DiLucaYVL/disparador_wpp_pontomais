@@ -16,7 +16,8 @@ TEMPLATES = {
     "Horas Faltantes": "*{nome}* ficou devendo *{horas}*. Por favor *justificar*.",
     "Interjornada insuficiente": "*{nome}* teve interjornada (período mínimo de descanso entre um expediente e outro) menor que 11h. _Tempo registrado_: *{horas}*.",
     "Intrajornada insuficiente": "*{nome}* teve pausa de almoço menor que 1h. _Tempo registrado_: *{horas}*.",
-    "Horas extras": "*{nome}* fez *{horas_extras} extras*. Por favor *ajustar*."
+    "Horas extras": "*{nome}* fez *{horas_extras} extras*. Por favor *ajustar*.",
+    "Mais de 2 horas de intervalo": "*{nome}* teve mais de 2 horas de intervalo. _Intervalo registrado_: *{intervalo}*. Por favor *verificar*."
 }
 
 # === Funções auxiliares ===
@@ -149,12 +150,15 @@ def gerar_mensagem(grupo) -> Optional[MensagemDetalhada]:
         if not tpl:
             continue
 
+        horas_fmt = formatar_horas_extras(valor)
         msg = tpl.format(
             nome=nome,
             data=data,
             valor=valor,
             horas=formatar_horas(valor),
-            horas_extras=formatar_horas_extras(valor),
+            horas_extras=horas_fmt,
+            horas_minutos=horas_fmt,
+            intervalo=horas_fmt,
         ).strip()
 
         if msg and msg not in mensagens_set:

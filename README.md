@@ -447,11 +447,12 @@ TEMPLATES = {
     "Horas Faltantes": "*{nome}* ficou devendo *{horas}*. Por favor *justificar*.",
     "Interjornada insuficiente": "*{nome}* teve interjornada (período mínimo de descanso entre um expediente e outro) menor que 11h. _Tempo registrado_: *{horas}*.",
     "Intrajornada insuficiente": "*{nome}* teve pausa de almoço menor que 1h. _Tempo registrado_: *{horas}*.",
-    "Horas extras": "*{nome}* fez *{horas_extras} extras*. Por favor *ajustar*."
+    "Horas extras": "*{nome}* fez *{horas_extras} extras*. Por favor *ajustar*.",
+    "Mais de 2 horas de intervalo": "*{nome}* teve mais de 2 horas de intervalo. _Intervalo registrado_: *{intervalo}*. Por favor *verificar*."
     # Adicione novos templates conforme necessário
 }
 
-# {horas_extras} é formatado dinamicamente (singular/plural) por formatar_horas_extras():
+# {horas_extras} e {intervalo} são formatados dinamicamente (singular/plural) por formatar_horas_extras():
 #   "02:00" -> "2 horas" | "02:15" -> "2 horas e 15 minutos" | "01:00" -> "1 hora"
 # "Horas extras" só é enviada a partir de 2h00 (120 minutos); abaixo disso é ignorada.
 

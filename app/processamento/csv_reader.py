@@ -6,21 +6,34 @@ from app.whatsapp.mensagem import validar_ocorrencia
 
 def carregar_dados(caminho_csv, ignorar_sabados, tipo_relatorio):
     if tipo_relatorio == "Auditoria":
-        # Detecta dinamicamente o tamanho do rodapé localizando a linha "Resumo",
-        # que marca o início do bloco de totais ao fim do relatório de Auditoria.
         with open(caminho_csv, encoding="utf-8", errors="replace") as _f:
             _linhas = _f.readlines()
         _total_linhas = len(_linhas)
-        # Localiza a primeira linha que começa com "Resumo" (a partir da linha 5,
-        # ignorando o cabeçalho do relatório).
+
+        # Detecta dinamicamente a linha de cabeçalho das colunas (Nome, Equipe, Ocorrência...)
+        _linha_cabecalho = next(
+            (
+                i for i, l in enumerate(_linhas)
+                if l.strip().startswith("Nome,")
+                or ("Nome" in l and "Equipe" in l and "Ocorrência" in l)
+            ),
+            None,
+        )
+        _skiprows = _linha_cabecalho if _linha_cabecalho is not None else 3
+
+        # Localiza a primeira linha que começa com "Resumo" (marca o início dos totais ao fim do relatório)
         _linha_resumo = next(
-            (i for i, l in enumerate(_linhas) if l.strip().startswith("Resumo")),
+            (i for i, l in enumerate(_linhas) if i > _skiprows and l.strip().startswith("Resumo")),
             None,
         )
         # Calcula quantas linhas cortar a partir do fim do arquivo.
-        # Se "Resumo" não for encontrado, mantém o valor padrão de segurança (12).
-        _skipfooter = _total_linhas - _linha_resumo if _linha_resumo is not None else 12
-        df = pd.read_csv(caminho_csv, skiprows=3, skipfooter=_skipfooter, engine="python")
+        # Se "Resumo" não for encontrado, mantém 0 se o arquivo começar no cabeçalho ou fallback seguro (12).
+        _skipfooter = (
+            _total_linhas - _linha_resumo
+            if _linha_resumo is not None
+            else (0 if _linha_cabecalho == 0 else 12)
+        )
+        df = pd.read_csv(caminho_csv, skiprows=_skiprows, skipfooter=_skipfooter, engine="python")
 
         # === Ignorar determinados registros de sábado
         if ignorar_sabados:

@@ -16,6 +16,8 @@ logs
 npm-debug.log*
 yarn-error.log*
 teste
+tests/*.csv
+*.csv
 
 # Arquivos temporários
 *.tmp
