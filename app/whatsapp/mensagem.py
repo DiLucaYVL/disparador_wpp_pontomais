@@ -28,22 +28,35 @@ def validar_ocorrencia(ocorrencia):
     if not isinstance(ocorrencia, str):
         return False
     ocorr_limpa = ocorrencia.strip()
-    return ocorr_limpa in TEMPLATES or "interjornada" in ocorr_limpa.lower()
+    return (
+        ocorr_limpa in TEMPLATES
+        or "interjornada" in ocorr_limpa.lower()
+        or normalizar(ocorr_limpa) in {
+            "mais de 2 horas de intervalo",
+            "+2 de intervalo",
+            "+2 horas de intervalo",
+            "mais de 2h de intervalo",
+        }
+    )
 
 def converter_horas_para_minutos(valor_horas):
     try:
         if not isinstance(valor_horas, str) or ":" not in valor_horas:
             return 0
-        horas, minutos = valor_horas.strip().split(":")
-        return int(horas) * 60 + int(minutos)
-    except:
+        partes = valor_horas.strip().split(":")
+        return int(partes[0]) * 60 + int(partes[1])
+    except Exception:
         return 0
 
 def formatar_horas(valor):
     if not isinstance(valor, str) or ":" not in valor:
         return valor
-    horas, minutos = valor.strip().split(":")
-    h, m = int(horas), int(minutos)
+    try:
+        partes = valor.strip().split(":")
+        horas, minutos = partes[0], partes[1]
+        h, m = int(horas), int(minutos)
+    except (ValueError, IndexError):
+        return valor
     if h == 0 and m == 0:
         return "00:00"
     if h == 0:
@@ -61,9 +74,9 @@ def formatar_horas_extras(valor):
     if not isinstance(valor, str) or ":" not in valor:
         return valor
     try:
-        horas_str, minutos_str = valor.strip().split(":")
-        h, m = int(horas_str), int(minutos_str)
-    except ValueError:
+        partes = valor.strip().split(":")
+        h, m = int(partes[0]), int(partes[1])
+    except (ValueError, IndexError):
         return valor
 
     partes = []
@@ -169,6 +182,39 @@ def gerar_mensagem(grupo) -> Optional[MensagemDetalhada]:
                                 mensagens_set.add(msg)
                                 if ocorr_limpo not in motivos_utilizados:
                                     motivos_utilizados.append(ocorr_limpo)
+                except Exception:
+                    pass
+            elif ocorr_norm in {
+                "mais de 2 horas de intervalo",
+                "+2 de intervalo",
+                "+2 horas de intervalo",
+                "mais de 2h de intervalo",
+            }:
+                try:
+                    # Envia apenas se o intervalo registrado for >= 2:10 (130 minutos)
+                    if converter_horas_para_minutos(valor_str) >= 130:
+                        tpl = TEMPLATES.get(ocorr_limpo) or TEMPLATES.get("Mais de 2 horas de intervalo")
+                        if tpl:
+                            horas_fmt = formatar_horas_extras(valor_str)
+                            msg = tpl.format(
+                                nome=nome,
+                                data=data,
+                                valor=valor_str,
+                                horas=formatar_horas(valor_str),
+                                horas_extras=horas_fmt,
+                                horas_minutos=horas_fmt,
+                                intervalo=horas_fmt,
+                            ).strip()
+                            if msg and msg not in mensagens_set:
+                                msgs.append(msg)
+                                mensagens_set.add(msg)
+                                motivo_nome = (
+                                    ocorr_limpo
+                                    if ocorr_limpo in TEMPLATES
+                                    else "Mais de 2 horas de intervalo"
+                                )
+                                if motivo_nome not in motivos_utilizados:
+                                    motivos_utilizados.append(motivo_nome)
                 except Exception:
                     pass
             else:

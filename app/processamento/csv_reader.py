@@ -74,6 +74,11 @@ def carregar_dados(caminho_csv, ignorar_sabados, tipo_relatorio):
             # Normalizar variações de interjornada exportadas pelo Pontomais
             mascara_inter = df["Ocorrência"].astype(str).str.contains("interjornada", case=False, na=False)
             df.loc[mascara_inter, "Ocorrência"] = "Interjornada insuficiente"
+            # Normalizar variações de intervalo (+2 de intervalo)
+            mascara_intervalo = df["Ocorrência"].astype(str).str.strip().str.lower().isin(
+                ["+2 de intervalo", "+2 horas de intervalo", "mais de 2h de intervalo"]
+            )
+            df.loc[mascara_intervalo, "Ocorrência"] = "Mais de 2 horas de intervalo"
         else:
             df["FaltaAbonadaJustificada"] = False
 

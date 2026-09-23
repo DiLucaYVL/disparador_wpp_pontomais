@@ -70,6 +70,33 @@ def test_gerar_mensagem_multiplas_ocorrencias_sem_perda():
     assert "Mais de 2 horas de intervalo" in detalhes.motivos
 
 
+def test_gerar_mensagem_multiplas_ocorrencias_intervalo_abaixo_de_2h10_ignorado():
+    """Garante que intervalo menor que 2h10 (ex: 02:05) é ignorado sem afetar outras ocorrências."""
+    grupo = pd.DataFrame([
+        {
+            "Nome": "Carlos Eduardo",
+            "Data": "10/11/2025",
+            "Ocorrência": "Falta",
+            "Valor": "",
+            "FaltaAbonadaJustificada": False,
+        },
+        {
+            "Nome": "Carlos Eduardo",
+            "Data": "10/11/2025",
+            "Ocorrência": "Mais de 2 horas de intervalo",
+            "Valor": "02:05",
+            "FaltaAbonadaJustificada": False,
+        },
+    ])
+
+    detalhes = gerar_mensagem(grupo)
+    assert isinstance(detalhes, MensagemDetalhada)
+    assert "faltou" in detalhes.texto
+    assert "mais de 2 horas de intervalo" not in detalhes.texto
+    assert "Falta" in detalhes.motivos
+    assert "Mais de 2 horas de intervalo" not in detalhes.motivos
+
+
 def test_gerar_mensagem_interjornada_pontomais():
     """Verifica mensagem gerada para 'Menos de 11:00 horas interjornada' vindo do Pontomais."""
     grupo = pd.DataFrame([
@@ -198,4 +225,27 @@ Total,1
     assert len(df) == 1
     assert df.iloc[0]["Nome"] == "Adriana Silva"
     assert df.iloc[0]["Motivo"] == "Número errado de pontos"
+
+
+def test_carregar_dados_auditoria_com_intervalo_variacao(tmp_path):
+    """Testa carregar_dados normalizando variações como '+2 de intervalo'."""
+    from app.processamento.csv_reader import carregar_dados
+
+    csv_content = """Relatório de Auditoria
+Por Usuário Master DP em 21/11/2025
+De 01/11/2025 até 10/11/2025
+
+Nome,Equipe,Data,Ocorrência,Valor
+Adriana Silva,Loja 97,"Seg, 03/11/2025",+2 de intervalo,02:15
+Adriana Silva,Loja 97,"Ter, 04/11/2025",Mais de 2 horas de intervalo,02:20
+Resumo,Totais
+Total,2
+"""
+    csv_file = tmp_path / "auditoria_intervalo.csv"
+    csv_file.write_text(csv_content, encoding="utf-8")
+
+    df = carregar_dados(str(csv_file), ignorar_sabados=False, tipo_relatorio="Auditoria")
+    assert len(df) == 2
+    assert (df["Ocorrência"] == "Mais de 2 horas de intervalo").all()
+
 

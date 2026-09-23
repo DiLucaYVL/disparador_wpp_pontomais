@@ -455,6 +455,7 @@ TEMPLATES = {
 # {horas_extras} e {intervalo} são formatados dinamicamente (singular/plural) por formatar_horas_extras():
 #   "02:00" -> "2 horas" | "02:15" -> "2 horas e 15 minutos" | "01:00" -> "1 hora"
 # "Horas extras" só é enviada a partir de 2h00 (120 minutos); abaixo disso é ignorada.
+# "Mais de 2 horas de intervalo" só é enviada a partir de 2h10 (130 minutos); abaixo disso é ignorada.
 
 # Para mensagens de Ocorrências, edite app/processamento/ocorrencias_processor.py
 # Para mensagens de Assinaturas, edite app/whatsapp/mensagem_assinaturas.py

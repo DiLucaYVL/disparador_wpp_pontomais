@@ -65,29 +65,49 @@ def test_gerar_mensagem_ignora_valor_invalido():
     assert resultado is None
 
 
-def _grupo_intervalo(valor):
+def _grupo_intervalo(valor, ocorrencia="Mais de 2 horas de intervalo"):
     return pd.DataFrame([
         {
             "Nome": "Fulano",
             "Data": "10/11/2025",
-            "Ocorrência": "Mais de 2 horas de intervalo",
+            "Ocorrência": ocorrencia,
             "Valor": valor,
             "FaltaAbonadaJustificada": False,
         }
     ])
 
 
-def test_gerar_mensagem_mais_de_2_horas_intervalo():
-    resultado = gerar_mensagem(_grupo_intervalo("02:01"))
+@pytest.mark.parametrize("valor", ["02:00", "02:01", "02:05", "02:09", "01:50"])
+def test_gerar_mensagem_intervalo_ignora_abaixo_de_2h10(valor):
+    resultado = gerar_mensagem(_grupo_intervalo(valor))
+    assert resultado is None
+
+
+def test_gerar_mensagem_intervalo_envia_a_partir_de_2h10():
+    resultado = gerar_mensagem(_grupo_intervalo("02:10"))
     assert resultado is not None
-    assert "2 horas e 1 minuto" in resultado.texto
+    assert "2 horas e 10 minutos" in resultado.texto
     assert "Fulano" in resultado.texto
     assert "Mais de 2 horas de intervalo" in resultado.motivos
 
 
-def test_gerar_mensagem_mais_de_2_horas_intervalo_redondo():
-    resultado = gerar_mensagem(_grupo_intervalo("02:00"))
+def test_gerar_mensagem_intervalo_envia_acima_de_2h10():
+    resultado = gerar_mensagem(_grupo_intervalo("02:15"))
     assert resultado is not None
-    assert "2 horas" in resultado.texto
+    assert "2 horas e 15 minutos" in resultado.texto
     assert "Fulano" in resultado.texto
+    assert "Mais de 2 horas de intervalo" in resultado.motivos
+
+
+def test_gerar_mensagem_intervalo_ignora_invalido():
+    resultado = gerar_mensagem(_grupo_intervalo("invalido"))
+    assert resultado is None
+
+
+def test_gerar_mensagem_intervalo_variacao_nome():
+    resultado = gerar_mensagem(_grupo_intervalo("02:10", ocorrencia="+2 de intervalo"))
+    assert resultado is not None
+    assert "2 horas e 10 minutos" in resultado.texto
+    assert "Mais de 2 horas de intervalo" in resultado.motivos
+
 
