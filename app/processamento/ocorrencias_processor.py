@@ -18,46 +18,41 @@ def filtrar_pendencia_gestor(df: pd.DataFrame) -> pd.DataFrame:
     return df[df["Ação pendente"].apply(eh_pendencia_gestor)]
 
 
+def gerar_linha_ocorrencia(row) -> Optional[str]:
+    """Gera o texto da mensagem para uma ocorrência específica."""
+    nome = row.get("Nome", "")
+    motivo = row.get("Motivo")
+    if not motivo and "Ocorrência" in row:
+        motivo = row.get("Ocorrência")
+    acao_pendente = row.get("Ação pendente")
+    if not acao_pendente and "Valor" in row:
+        acao_pendente = row.get("Valor")
+
+    if not isinstance(motivo, str) or not validar_motivo(motivo.strip()):
+        return None
+
+    motivo = motivo.strip()
+    acao_pendente = (
+        str(acao_pendente).strip()
+        if acao_pendente is not None and str(acao_pendente).strip() not in {"nan", "None"}
+        else ""
+    )
+
+    acao_texto = f"\nAção pendente: *{acao_pendente}*." if acao_pendente else ""
+    if motivo == "Número de pontos menor que o previsto" and acao_pendente == "Gestor aprovar solicitação de ajuste":
+        return f"*{nome}* solicitou ajuste.{acao_texto}"
+    elif motivo == "Número de pontos menor que o previsto" and acao_pendente == "Gestor corrigir lançamento de exceção":
+        return f"*{nome}* apresentou _{motivo.lower()}_.{acao_texto}"
+    elif motivo == "Número de pontos menor que o previsto":
+        return f"*{nome}* está com o _{motivo.lower()}_.{acao_texto}"
+    elif motivo == "Número errado de pontos":
+        return f"*{nome}* apresentou _{motivo.lower()}_.{acao_texto}"
+    else:
+        return f"*{nome}* _{motivo.lower()}_.{acao_texto}"
+
+
 def processar_ocorrencias(df: pd.DataFrame) -> pd.Series:
-    # Lógica para processar as colunas 'Motivo' e 'Ação pendente'
-    # e gerar as mensagens específicas para o relatório de ocorrências.
-    # Esta função será chamada pelo controller.
-    
-    def gerar_linha_ocorrencia(row) -> Optional[str]:
-        nome = row["Nome"]
-        motivo = row["Motivo"]
-        acao_pendente = row["Ação pendente"]
-
-        if not validar_motivo(motivo):
-            return None
-        
-        if motivo == "Número de pontos menor que o previsto" and acao_pendente == "Gestor aprovar solicitação de ajuste":
-            return (
-                f"*{nome}* solicitou ajuste.\n"
-                f"Ação pendente: *{acao_pendente}*."
-            )
-        elif motivo == "Número de pontos menor que o previsto" and acao_pendente == "Gestor corrigir lançamento de exceção":
-            return (
-                f"*{nome}* apresentou _{motivo.lower()}_.\n"
-                f"Ação pendente: *{acao_pendente}*."
-            )
-        elif motivo == "Número de pontos menor que o previsto":
-            return (
-                f"*{nome}* está com o _{motivo.lower()}_.\n"
-                f"Ação pendente: *{acao_pendente}*."
-            )
-        elif motivo == "Número errado de pontos":
-            return (
-                f"*{nome}* apresentou _{motivo.lower()}_.\n"
-                f"Ação pendente: *{acao_pendente}*."
-            )
-        else:
-            return (
-                f"*{nome}* _{motivo.lower()}_.\n"
-                f"Ação pendente: *{acao_pendente}*."
-            )
-
-    # Agrupar por Nome e Data para consolidar as mensagens por ocorrência
+    """Processa DataFrame de ocorrências e gera mensagens agrupadas por Nome e Data."""
     def compilar_mensagens(grupo: pd.DataFrame) -> Optional[MensagemDetalhada]:
         textos: List[str] = []
         motivos: List[str] = []
@@ -66,7 +61,7 @@ def processar_ocorrencias(df: pd.DataFrame) -> pd.Series:
             if not mensagem:
                 continue
             textos.append(mensagem)
-            motivo = row.get("Motivo")
+            motivo = row.get("Motivo") or row.get("Ocorrência")
             if isinstance(motivo, str):
                 motivo_limpo = motivo.strip()
                 if motivo_limpo and motivo_limpo not in motivos:

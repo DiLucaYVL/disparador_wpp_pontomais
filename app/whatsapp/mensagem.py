@@ -3,7 +3,8 @@ from typing import List, Optional
 
 import pandas as pd
 
-from app.processamento.ocorrencias_processor import processar_ocorrencias
+from app.processamento.ocorrencias_processor import processar_ocorrencias, gerar_linha_ocorrencia
+from app.processamento.motivos_ocorrencias import validar_motivo
 from app.types import MensagemDetalhada
 
 # === Templates para relatório de Auditoria ===
@@ -15,6 +16,7 @@ TEMPLATES = {
     "Falta": "*{nome}* _faltou_. Por favor *justificar*.",
     "Horas Faltantes": "*{nome}* ficou devendo *{horas}*. Por favor *justificar*.",
     "Interjornada insuficiente": "*{nome}* teve interjornada (período mínimo de descanso entre um expediente e outro) menor que 11h. _Tempo registrado_: *{horas}*.",
+    "Menos de 11:00 horas interjornada": "*{nome}* teve interjornada (período mínimo de descanso entre um expediente e outro) menor que 11h. _Tempo registrado_: *{horas}*.",
     "Intrajornada insuficiente": "*{nome}* teve pausa de almoço menor que 1h. _Tempo registrado_: *{horas}*.",
     "Horas extras": "*{nome}* fez *{horas_extras} extras*. Por favor *ajustar*.",
     "Mais de 2 horas de intervalo": "*{nome}* teve mais de 2 horas de intervalo. _Intervalo registrado_: *{intervalo}*. Por favor *verificar*."
@@ -23,7 +25,10 @@ TEMPLATES = {
 # === Funções auxiliares ===
 
 def validar_ocorrencia(ocorrencia):
-    return ocorrencia in TEMPLATES
+    if not isinstance(ocorrencia, str):
+        return False
+    ocorr_limpa = ocorrencia.strip()
+    return ocorr_limpa in TEMPLATES or "interjornada" in ocorr_limpa.lower()
 
 def converter_horas_para_minutos(valor_horas):
     try:
@@ -80,126 +85,155 @@ def normalizar(texto):
 def gerar_mensagem(grupo) -> Optional[MensagemDetalhada]:
     nome = grupo["Nome"].iloc[0]
     data = grupo["Data"].iloc[0]
-    ocorrencias = grupo.set_index("Ocorrência")["Valor"].astype(str).to_dict()
 
-    # Normaliza as chaves e valores
-    ocorrencias_norm = {normalizar(k): normalizar(v) for k, v in ocorrencias.items()}
+    falta_justificada_ou_abonada = False
+    if "FaltaAbonadaJustificada" in grupo.columns:
+        falta_justificada_ou_abonada = bool(grupo["FaltaAbonadaJustificada"].any())
+
+    ocorrencias_dict = {}
+    if "Ocorrência" in grupo.columns and "Valor" in grupo.columns:
+        for _, r in grupo.iterrows():
+            k = str(r["Ocorrência"]).strip()
+            v = str(r["Valor"]).strip()
+            if k and k not in {"nan", "None", ""}:
+                ocorrencias_dict[k] = v
+
+    ocorrencias_norm = {normalizar(k): normalizar(v) for k, v in ocorrencias_dict.items()}
+
+    tem_ambas_horas_extras = (
+        "horas extras" in ocorrencias_norm
+        and "mais de duas horas extras" in ocorrencias_norm
+        and ocorrencias_dict.get("Horas extras") == ocorrencias_dict.get("Mais de duas horas extras")
+    )
+
+    tem_falta = "falta" in ocorrencias_norm and not falta_justificada_ou_abonada
+    tem_horas_faltantes = "horas faltantes" in ocorrencias_norm and not falta_justificada_ou_abonada
 
     msgs: List[str] = []
     mensagens_set = set()
     motivos_utilizados: List[str] = []
 
-    # Verifica se há falta justificada/abonada para a mesma pessoa e data
-    # Agora, verifica a nova coluna 'FaltaAbonadaJustificada' no grupo
-    falta_justificada_ou_abonada = grupo["FaltaAbonadaJustificada"].any()
-
-    # Ignora duplicidade entre duas ocorrências iguais
-    tem_ambas_horas_extras = (
-        "horas extras" in ocorrencias_norm and
-        "mais de duas horas extras" in ocorrencias_norm and
-        ocorrencias.get("Horas extras") == ocorrencias.get("Mais de duas horas extras")
-    )
-
-    # ✅ Combinação especial: falta + horas faltantes não justificadas
-    tem_falta = "falta" in ocorrencias_norm and not grupo["FaltaAbonadaJustificada"].any()
-    tem_horas_faltantes = "horas faltantes" in ocorrencias_norm and not grupo["FaltaAbonadaJustificada"].any()
-
+    # 1. Combinação especial: falta + horas faltantes não justificadas
     if tem_falta and tem_horas_faltantes:
-        valor_faltante = ocorrencias.get("Horas Faltantes") or ocorrencias.get("horas faltantes")
-        msg = f"*{nome}* _faltou_ e _ficou devendo_ *{formatar_horas(valor_faltante)}*. Por favor *ajustar*."
-        return MensagemDetalhada(
-            texto=msg,
-            motivos=["Falta", "Horas Faltantes"],
-        )
+        valor_faltante = ocorrencias_dict.get("Horas Faltantes") or ocorrencias_dict.get("horas faltantes") or ""
+        msg_combinada = f"*{nome}* _faltou_ e _ficou devendo_ *{formatar_horas(valor_faltante)}*. Por favor *ajustar*."
+        msgs.append(msg_combinada)
+        mensagens_set.add(msg_combinada)
+        for m in ["Falta", "Horas Faltantes"]:
+            if m not in motivos_utilizados:
+                motivos_utilizados.append(m)
 
-    
-    for index, row in grupo.iterrows(): # Itera sobre as linhas do grupo, não apenas as chaves de ocorrencias
-        ocorr = row["Ocorrência"]
-        valor = row["Valor"]
+    # 2. Itera sobre todas as linhas do grupo para processar Auditoria e/ou Ocorrências
+    for _, row in grupo.iterrows():
+        ocorr = row.get("Ocorrência")
+        valor = row.get("Valor")
+        motivo = row.get("Motivo")
 
-        if not isinstance(ocorr, str) or ocorr.strip() == "":
-            continue
+        # Processamento Auditoria
+        if isinstance(ocorr, str) and ocorr.strip() and ocorr.strip() not in {"nan", "None"}:
+            ocorr_limpo = ocorr.strip()
+            if "interjornada" in ocorr_limpo.lower():
+                ocorr_limpo = "Interjornada insuficiente"
+            ocorr_norm = normalizar(ocorr_limpo)
+            valor_str = str(valor).strip() if valor is not None and str(valor).strip() not in {"nan", "None"} else ""
 
-        ocorr_norm = normalizar(ocorr)
-        valor_norm = normalizar(valor)
+            # Se já combinou falta + horas faltantes, ignora individualmente
+            if tem_falta and tem_horas_faltantes and ocorr_norm in {"falta", "horas faltantes"}:
+                pass
+            elif ocorr_norm == "horas faltantes" and falta_justificada_ou_abonada:
+                pass
+            elif ocorr_norm == "falta" and row.get("FaltaAbonadaJustificada", False):
+                pass
+            elif tem_ambas_horas_extras and ocorr_norm == "mais de duas horas extras":
+                pass
+            elif ocorr_norm == "horas faltantes" and converter_horas_para_minutos(valor_str) < 60:
+                pass
+            elif ocorr_norm == "horas extras":
+                try:
+                    h, m = map(int, valor_str.split(":"))
+                    if h * 60 + m >= 120:
+                        tpl = TEMPLATES.get(ocorr_limpo)
+                        if tpl:
+                            horas_fmt = formatar_horas_extras(valor_str)
+                            msg = tpl.format(
+                                nome=nome,
+                                data=data,
+                                valor=valor_str,
+                                horas=formatar_horas(valor_str),
+                                horas_extras=horas_fmt,
+                                horas_minutos=horas_fmt,
+                                intervalo=horas_fmt,
+                            ).strip()
+                            if msg and msg not in mensagens_set:
+                                msgs.append(msg)
+                                mensagens_set.add(msg)
+                                if ocorr_limpo not in motivos_utilizados:
+                                    motivos_utilizados.append(ocorr_limpo)
+                except Exception:
+                    pass
+            else:
+                tpl = TEMPLATES.get(ocorr_limpo)
+                if tpl:
+                    horas_fmt = formatar_horas_extras(valor_str)
+                    msg = tpl.format(
+                        nome=nome,
+                        data=data,
+                        valor=valor_str,
+                        horas=formatar_horas(valor_str),
+                        horas_extras=horas_fmt,
+                        horas_minutos=horas_fmt,
+                        intervalo=horas_fmt,
+                    ).strip()
+                    if msg and msg not in mensagens_set:
+                        msgs.append(msg)
+                        mensagens_set.add(msg)
+                        if ocorr_limpo not in motivos_utilizados:
+                            motivos_utilizados.append(ocorr_limpo)
 
-        # ✅ Regra principal: ignora mensagem de horas faltantes se houver falta justificada
-        if ocorr_norm == "horas faltantes" and falta_justificada_ou_abonada:
-            continue
+        # Processamento Ocorrências (seja na coluna 'Motivo' ou 'Ocorrência')
+        motivo_oco = motivo if (isinstance(motivo, str) and motivo.strip() and motivo.strip() not in {"nan", "None"}) else None
+        if not motivo_oco and isinstance(ocorr, str) and validar_motivo(ocorr.strip()):
+            motivo_oco = ocorr.strip()
 
-        # Ignora a própria ocorrência de Falta se ela for abonada/justificada
-        if ocorr_norm == "falta" and row["FaltaAbonadaJustificada"]:
-            continue
-
-        if tem_ambas_horas_extras and ocorr_norm == "mais de duas horas extras":
-            continue
-
-        if ocorr_norm == "horas faltantes":
-            if converter_horas_para_minutos(valor) < 60:
-                continue
-
-        if ocorr_norm == "horas extras":
-            try:
-                h, m = map(int, valor.strip().split(":"))
-            except Exception:
-                continue
-            if h * 60 + m < 120:
-                continue
-
-        tpl = TEMPLATES.get(ocorr.strip())
-        if not tpl:
-            continue
-
-        horas_fmt = formatar_horas_extras(valor)
-        msg = tpl.format(
-            nome=nome,
-            data=data,
-            valor=valor,
-            horas=formatar_horas(valor),
-            horas_extras=horas_fmt,
-            horas_minutos=horas_fmt,
-            intervalo=horas_fmt,
-        ).strip()
-
-        if msg and msg not in mensagens_set:
-            msgs.append(msg)
-            mensagens_set.add(msg)
-            motivo = ocorr.strip()
-            if motivo and motivo not in motivos_utilizados:
-                motivos_utilizados.append(motivo)
+        if motivo_oco and validar_motivo(motivo_oco):
+            msg_oco = gerar_linha_ocorrencia(row)
+            if msg_oco and msg_oco not in mensagens_set:
+                msgs.append(msg_oco)
+                mensagens_set.add(msg_oco)
+                if motivo_oco not in motivos_utilizados:
+                    motivos_utilizados.append(motivo_oco)
 
     if not msgs:
         return None
 
-    motivos = [m for m in motivos_utilizados if m]
-    return MensagemDetalhada(texto="\n".join(msgs), motivos=motivos)
+    return MensagemDetalhada(texto="\n".join(msgs), motivos=[m for m in motivos_utilizados if m])
+
 
 # === Gera todas as mensagens agrupadas por Nome + Data ===
 
 def gerar_mensagens(df, tipo_relatorio):
     tipo_normalizado = tipo_relatorio.strip().lower()
 
-    if tipo_normalizado == "auditoria":
-        if 'FaltaAbonadaJustificada' not in df.columns:
-            df['FaltaAbonadaJustificada'] = False
-        indices = []
-        valores = []
-        for (nome_grupo, data_grupo), grupo in df.groupby(["Nome", "Data"], sort=False):
-            resultado = gerar_mensagem(grupo)
-            if resultado is not None:
-                indices.append((nome_grupo, data_grupo))
-                valores.append(resultado)
-        if not valores:
-            return pd.Series(dtype=object)
-        mensagens = pd.Series(
-            valores,
-            index=pd.MultiIndex.from_tuples(indices, names=["Nome", "Data"]),
-        )
-
-    elif tipo_normalizado in {"ocorrencias", "ocorrências"}:
-        mensagens = processar_ocorrencias(df)
-
-    else:
+    if tipo_normalizado not in {"auditoria", "ocorrencias", "ocorrências"}:
         raise ValueError(f"Tipo de relatório inválido: {tipo_relatorio!r}")
+
+    if "FaltaAbonadaJustificada" not in df.columns:
+        df["FaltaAbonadaJustificada"] = False
+
+    indices = []
+    valores = []
+    for (nome_grupo, data_grupo), grupo in df.groupby(["Nome", "Data"], sort=False):
+        resultado = gerar_mensagem(grupo)
+        if resultado is not None:
+            indices.append((nome_grupo, data_grupo))
+            valores.append(resultado)
+
+    if not valores:
+        return pd.Series(dtype=object)
+
+    mensagens = pd.Series(
+        valores,
+        index=pd.MultiIndex.from_tuples(indices, names=["Nome", "Data"]),
+    )
 
     return mensagens.dropna()

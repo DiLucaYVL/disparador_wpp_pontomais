@@ -10,20 +10,20 @@ def carregar_dados(caminho_csv, ignorar_sabados, tipo_relatorio):
             _linhas = _f.readlines()
         _total_linhas = len(_linhas)
 
-        # Detecta dinamicamente a linha de cabeçalho das colunas (Nome, Equipe, Ocorrência...)
+        # Detecta dinamicamente a linha de cabeçalho das colunas (Nome, Equipe, Ocorrência, Motivo...)
         _linha_cabecalho = next(
             (
                 i for i, l in enumerate(_linhas)
                 if l.strip().startswith("Nome,")
-                or ("Nome" in l and "Equipe" in l and "Ocorrência" in l)
+                or ("Nome" in l and "Equipe" in l and ("Ocorrência" in l or "Ocorr" in l or "Motivo" in l))
             ),
             None,
         )
         _skiprows = _linha_cabecalho if _linha_cabecalho is not None else 3
 
-        # Localiza a primeira linha que começa com "Resumo" (marca o início dos totais ao fim do relatório)
+        # Localiza a primeira linha que começa com "Resumo" ou "Total"
         _linha_resumo = next(
-            (i for i, l in enumerate(_linhas) if i > _skiprows and l.strip().startswith("Resumo")),
+            (i for i, l in enumerate(_linhas) if i > _skiprows and (l.strip().startswith("Resumo") or l.strip().startswith("Total"))),
             None,
         )
         # Calcula quantas linhas cortar a partir do fim do arquivo.
@@ -40,15 +40,19 @@ def carregar_dados(caminho_csv, ignorar_sabados, tipo_relatorio):
             # Limpar e identificar sábados
             data_col = df["Data"].astype(str).str.replace("\"", "").str.strip().str.lower()
             df["DataLimpa"] = data_col
-            df["DataFormatada"] = df["DataLimpa"].str[5:]
+            df["DataFormatada"] = df["DataLimpa"].str.split(",").str[-1].str.strip()
 
             # Filtro 1: Sábados com "Falta"
-            is_sabado = data_col.str.startswith("sáb,")
-            is_falta = df["Ocorrência"] == "Falta"
+            is_sabado = data_col.str.startswith("sáb,") | data_col.str.startswith("sab,")
+            is_falta = (df["Ocorrência"] == "Falta") if "Ocorrência" in df.columns else False
             is_sabado_falta = is_sabado & is_falta
 
             # Filtro 2: Sábados com "Horas Faltantes" == 04:00
-            is_horas_faltantes = (df["Ocorrência"] == "Horas Faltantes") & (df["Valor"].astype(str).str.strip() == "04:00")
+            is_horas_faltantes = (
+                (df["Ocorrência"] == "Horas Faltantes") & (df["Valor"].astype(str).str.strip() == "04:00")
+                if ("Ocorrência" in df.columns and "Valor" in df.columns)
+                else False
+            )
             is_sabado_horas_4 = is_sabado & is_horas_faltantes
 
             # Combinar datas e nomes para remoção
@@ -59,21 +63,41 @@ def carregar_dados(caminho_csv, ignorar_sabados, tipo_relatorio):
             # Atualizar a coluna final de Data
             df["Data"] = df["DataFormatada"]
         else:
-            df["Data"] = df["Data"].astype(str).str.replace("\"", "").str[5:].str.strip()
+            df["Data"] = df["Data"].astype(str).str.replace("\"", "").str.split(",").str[-1].str.strip()
 
-        # === Marcar faltas abonadas/justificadas em vez de removê-las ===
-        # Adiciona uma coluna temporária para indicar se a falta é abonada/justificada
-        df["FaltaAbonadaJustificada"] = ((df["Ocorrência"] == "Falta") & 
-        (df["Valor"].astype(str).str.lower().isin(["abonada", "justificada"])))
+        # === Marcar faltas abonadas/justificadas e normalizar interjornada ===
+        if "Ocorrência" in df.columns and "Valor" in df.columns:
+            df["FaltaAbonadaJustificada"] = (
+                (df["Ocorrência"] == "Falta")
+                & (df["Valor"].astype(str).str.lower().isin(["abonada", "justificada"]))
+            )
+            # Normalizar variações de interjornada exportadas pelo Pontomais
+            mascara_inter = df["Ocorrência"].astype(str).str.contains("interjornada", case=False, na=False)
+            df.loc[mascara_inter, "Ocorrência"] = "Interjornada insuficiente"
+        else:
+            df["FaltaAbonadaJustificada"] = False
 
         df["EquipeTratada"] = df["Equipe"].apply(mapear_equipe)
 
         # Remover colunas temporárias se existirem
         df.drop(columns=["DataLimpa", "DataFormatada"], errors="ignore", inplace=True)
 
-        df = df[df["Ocorrência"].apply(validar_ocorrencia)]
+        # Validação flexível: aceita ocorrências de Auditoria E de Ocorrências
+        from app.processamento.motivos_ocorrencias import validar_motivo
 
-        equipes_validas = sorted(df["EquipeTratada"].dropna().unique().tolist())
+        def eh_registro_valido(row):
+            ocorr = row.get("Ocorrência")
+            if isinstance(ocorr, str) and (validar_ocorrencia(ocorr.strip()) or "interjornada" in ocorr.lower()):
+                return True
+            motivo = row.get("Motivo")
+            if isinstance(motivo, str) and validar_motivo(motivo.strip()):
+                return True
+            if isinstance(ocorr, str) and validar_motivo(ocorr.strip()):
+                return True
+            return False
+
+        df = df[df.apply(eh_registro_valido, axis=1)]
+
         return df
     elif tipo_relatorio == "Ocorrências":
         return carregar_dados_ocorrencias(caminho_csv)
