@@ -42,7 +42,7 @@ disparador_wpp_pontomais/
 │   │   └── numeros_equipes.py   # Resolução do número WPP por equipe
 │   └── services/
 │       ├── google_sheets.py     # Integração Google Sheets API
-│       ├── feriados.py          # Feriados nacionais via BrasilAPI (cache por ano)
+│       ├── feriados.py          # Feriados nacionais (BrasilAPI → Nager.Date → cálculo local, cache por ano)
 │       └── email_sender.py      # Utilitário de envio de log por SMTP (não é chamado automaticamente pelo fluxo atual)
 ├── templates/                   # Templates Jinja2 (index.html, historico.html)
 ├── static/                      # Assets estáticos (JS, CSS)
@@ -76,7 +76,7 @@ Nunca versione `.env`; use `.env.example` como referência dos nomes.
 
 Para Ocorrências, o checkbox "Enviar apenas ajustes pendentes de aprovação do gestor" (frontend) aplica `filtrar_pendencia_gestor()` — só envia/registra linhas com `Ação pendente = "Gestor aprovar solicitação de ajuste"`. Quando ativo, `history.buscar_ocorrencias_enviadas()` também é usada para pular ocorrências (mesma pessoa+data+motivo) já enviadas com sucesso em um upload anterior, a menos que o usuário confirme o reenvio no modal de duplicidade. Ao selecionar o arquivo CSV (evento `change` do input), o frontend (`eventos.js:confirmarSelecaoArquivo`) avisa se esse checkbox está marcado ou não e pede confirmação antes de processar o CSV.
 
-Para Auditoria e Ocorrências, `/equipes` retorna os feriados nacionais (BrasilAPI, `app/services/feriados.py`) presentes nas datas do relatório. Se houver algum, ao clicar em enviar o frontend (`eventos.js:abrirModalFeriados`) lista os feriados e pergunta se o envio deve incluí-los (`incluirFeriados`). Se não incluídos, as linhas dessas datas são removidas antes do envio e do registro no histórico. As mensagens desses relatórios recebem um rodapé em itálico (`_..._`) pedindo para desconsiderar feriados estaduais/municipais (não mapeados pela BrasilAPI), exceto quando há feriado nacional detectado e o usuário opta por incluí-lo. Se a BrasilAPI estiver indisponível, nenhum feriado é detectado e o envio segue normalmente.
+Para Auditoria e Ocorrências, `/equipes` retorna os feriados nacionais (BrasilAPI, `app/services/feriados.py`) presentes nas datas do relatório. Se houver algum, ao clicar em enviar o frontend (`eventos.js:abrirModalFeriados`) lista os feriados e pergunta se o envio deve incluí-los (`incluirFeriados`). Se não incluídos, as linhas dessas datas são removidas antes do envio e do registro no histórico. As mensagens desses relatórios recebem um rodapé em itálico (`_..._`) pedindo para desconsiderar feriados estaduais/municipais (não mapeados pela BrasilAPI), exceto quando há feriado nacional detectado e o usuário opta por incluí-lo. Se a BrasilAPI estiver indisponível, a consulta cai para a Nager.Date (apenas feriados com `global=True`) e, se ela também falhar, para o cálculo local (`calcular_feriados_locais`: datas fixas + móveis derivadas da Páscoa).
 
 ## Diretrizes de desenvolvimento
 
