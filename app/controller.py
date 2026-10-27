@@ -19,6 +19,7 @@ from app.services.feriados import (
     TIPOS_RELATORIO_COM_FERIADO,
     gerar_rodape_feriados,
     identificar_feriados,
+    identificar_feriados_estaduais,
     remover_datas_feriado,
 )
 from collections import defaultdict
@@ -106,17 +107,19 @@ def processar_csv(
                     })
 
     ignoradas_feriado = 0
-    # O rodapé pede para desconsiderar feriados estaduais/municipais que a
-    # BrasilAPI não consegue mapear; só é omitido quando o usuário opta por
-    # incluir feriados nacionais detectados no relatório.
+    # O rodapé pede para desconsiderar feriados estaduais/municipais não
+    # mapeados; só é omitido quando o usuário opta por incluir os feriados
+    # (nacionais ou estaduais) detectados no relatório.
     rodape_feriados = ""
     if tipo_relatorio in TIPOS_RELATORIO_COM_FERIADO:
         feriados_encontrados = identificar_feriados(df["Data"].dropna().unique()) if not df.empty else {}
-        if not (feriados_encontrados and incluir_feriados):
+        feriados_estaduais = identificar_feriados_estaduais(df)
+        houve_feriado = bool(feriados_encontrados or feriados_estaduais)
+        if not (houve_feriado and incluir_feriados):
             rodape_feriados = gerar_rodape_feriados()
-        if feriados_encontrados and not incluir_feriados:
+        if houve_feriado and not incluir_feriados:
             total_antes = len(df)
-            df = remover_datas_feriado(df, feriados_encontrados)
+            df = remover_datas_feriado(df, feriados_encontrados, feriados_estaduais)
             ignoradas_feriado = total_antes - len(df)
             if ignoradas_feriado:
                 logs.append({
