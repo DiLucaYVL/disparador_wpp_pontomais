@@ -447,9 +447,18 @@ function abrirModalFeriados(feriados) {
     }
     if (modalFeriadosLista) {
         modalFeriadosLista.replaceChildren(
-            ...feriados.map(({ data, nome }) => {
+            ...feriados.map(({ data, nome, tipo, uf, equipes }) => {
                 const item = document.createElement('li');
-                item.textContent = `${data} - ${nome}`;
+                const titulo = document.createElement('strong');
+                titulo.textContent = `${data} - ${nome}`;
+                const detalhe = document.createElement('span');
+                if (tipo === 'Estadual') {
+                    const listaEquipes = Array.isArray(equipes) && equipes.length ? ` (equipes: ${equipes.join(', ')})` : '';
+                    detalhe.textContent = ` | Feriado estadual - Estado: ${uf}${listaEquipes}`;
+                } else {
+                    detalhe.textContent = ' | Feriado nacional - Todos os estados';
+                }
+                item.append(titulo, detalhe);
                 return item;
             }),
         );
