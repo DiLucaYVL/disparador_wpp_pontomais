@@ -18,7 +18,7 @@ disparador_wpp_pontomais/
 ├── gunicorn.conf.py             # Config do Gunicorn (gthread, timeout 600s)
 ├── requirements.txt
 ├── Dockerfile                   # python:3.11-slim
-├── docker-compose.yml
+├── docker-compose.yml           # app + redis (cache)
 ├── app/
 │   ├── routes.py                # Blueprint Flask: todos os endpoints da API
 │   ├── controller.py            # Orquestração do fluxo de processamento
@@ -42,7 +42,9 @@ disparador_wpp_pontomais/
 │   │   └── numeros_equipes.py   # Resolução do número WPP por equipe
 │   └── services/
 │       ├── google_sheets.py     # Integração Google Sheets API
-│       ├── feriados.py          # Feriados nacionais (BrasilAPI → Nager.Date → cálculo local, cache por ano)
+│       ├── cache_diario.py      # Cache diário em Redis (expira à meia-noite; fallback em memória)
+│       ├── estados_lojas.py     # UF por equipe (planilha de lojas; setores = TO)
+│       ├── feriados.py          # Feriados nacionais (FeriadosAPI → BrasilAPI → Nager.Date → cálculo local) e estaduais (FeriadosAPI)
 │       └── email_sender.py      # Utilitário de envio de log por SMTP (não é chamado automaticamente pelo fluxo atual)
 ├── templates/                   # Templates Jinja2 (index.html, historico.html)
 ├── static/                      # Assets estáticos (JS, CSS)
@@ -62,6 +64,9 @@ disparador_wpp_pontomais/
 | Planilha de equipes | `PLANILHA_EQUIPES_URL`, `PLANILHA_EQUIPES_SHEET_ID`, `PLANILHA_EQUIPES_WORKSHEET`, `PLANILHA_EQUIPES_GID` | Resolução do número de WhatsApp por equipe em `app/whatsapp/numeros_equipes.py` (CSV público, com fallback via Google Sheets API) |
 | Banco de dados | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Histórico de envios (MySQL) em `app/history.py` |
 | Google Sheets | `GOOGLE_SHEETS_ENABLED`, `GOOGLE_SHEETS_SPREADSHEET_ID`, `GOOGLE_SHEETS_WORKSHEET`, `GOOGLE_SHEETS_CREDENTIALS_FILE`, `GOOGLE_SHEETS_CREDENTIALS_JSON` | Gravação opcional do DataFrame processado em `app/services/google_sheets.py` |
+| Planilha de lojas | `GOOGLE_SHEETS_LOJA_ID`, `GOOGLE_SHEETS_LOJA_WORKSHEET`, `GOOGLE_SHEETS_LOJA_SERVICE_ACCOUNT`, `GOOGLE_SHEETS_LOJA_PRIVATE_KEY` | Estado (UF) das lojas em `app/services/estados_lojas.py`: a coluna B é normalizada com `mapear_equipe` e o estado vem da coluna com cabeçalho "UF"/"Estado" (hoje "ESTADO"); setores (equipes que não são código de loja) são `TO` |
+| FeriadosAPI | `FERIADOS_API_KEY` | Fonte principal de feriados nacionais e única de estaduais em `app/services/feriados.py` (header `Authorization: Bearer`). Plano free: 60 req/min, nacionais/estaduais sem cota mensal; cidades do interior e consulta por data são pagas e não são usadas |
+| Redis | `REDIS_URL` | Cache diário (`app/services/cache_diario.py`) das respostas de feriados e da planilha de lojas. No Docker Compose é definido como `redis://redis:6379/0`; vazio = cache em memória do processo |
 | E-mail (opcional) | `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_TO`, `EMAIL_HOST`, `EMAIL_PORT` | Usadas por `app/services/email_sender.py`, que hoje não é chamado por nenhuma rota ou tarefa |
 
 Nunca versione `.env`; use `.env.example` como referência dos nomes.
@@ -76,7 +81,7 @@ Nunca versione `.env`; use `.env.example` como referência dos nomes.
 
 Para Ocorrências, o checkbox "Enviar apenas ajustes pendentes de aprovação do gestor" (frontend) aplica `filtrar_pendencia_gestor()` — só envia/registra linhas com `Ação pendente = "Gestor aprovar solicitação de ajuste"`. Quando ativo, `history.buscar_ocorrencias_enviadas()` também é usada para pular ocorrências (mesma pessoa+data+motivo) já enviadas com sucesso em um upload anterior, a menos que o usuário confirme o reenvio no modal de duplicidade. Ao selecionar o arquivo CSV (evento `change` do input), o frontend (`eventos.js:confirmarSelecaoArquivo`) avisa se esse checkbox está marcado ou não e pede confirmação antes de processar o CSV.
 
-Para Auditoria e Ocorrências, `/equipes` retorna os feriados nacionais (BrasilAPI, `app/services/feriados.py`) presentes nas datas do relatório. Se houver algum, ao clicar em enviar o frontend (`eventos.js:abrirModalFeriados`) lista os feriados e pergunta se o envio deve incluí-los (`incluirFeriados`). Se não incluídos, as linhas dessas datas são removidas antes do envio e do registro no histórico. As mensagens desses relatórios recebem um rodapé em itálico (`_..._`) pedindo para desconsiderar feriados estaduais/municipais (não mapeados pela BrasilAPI), exceto quando há feriado nacional detectado e o usuário opta por incluí-lo. Se a BrasilAPI estiver indisponível, a consulta cai para a Nager.Date (apenas feriados com `global=True`) e, se ela também falhar, para o cálculo local (`calcular_feriados_locais`: datas fixas + móveis derivadas da Páscoa).
+Para Auditoria e Ocorrências, `/equipes` retorna os feriados nacionais e estaduais (`app/services/feriados.py`) presentes no relatório. Os estaduais consideram a UF de cada equipe (`app/services/estados_lojas.py`: lojas pela planilha de lojas, setores = TO) e só valem para as equipes daquele estado. Se houver algum, ao clicar em enviar o frontend (`eventos.js:abrirModalFeriados`) lista data, nome e abrangência (nacional ou estadual com a UF e as equipes afetadas) e pergunta se o envio deve incluí-los (`incluirFeriados`). Se não incluídos, as linhas dessas datas (nos estaduais, apenas das equipes da UF) são removidas antes do envio e do registro no histórico. As mensagens desses relatórios recebem um rodapé em itálico (`_..._`) pedindo para desconsiderar feriados estaduais/municipais não mapeados, exceto quando há feriado detectado e o usuário opta por incluí-lo. Os feriados nacionais vêm da FeriadosAPI; se ela falhar, a consulta cai para a BrasilAPI, depois a Nager.Date (apenas `global=True`) e, por fim, o cálculo local (`calcular_feriados_locais`: datas fixas + móveis derivadas da Páscoa). Os estaduais só existem na FeriadosAPI (apenas nacionais e estaduais são consultados; municipais exigem plano pago fora das capitais): se ela ou a planilha de lojas falharem, são ignorados (com aviso no log). As respostas (feriados nacionais por ano, estaduais por UF/ano e a planilha de lojas) ficam no cache diário em Redis até a meia-noite (America/Sao_Paulo), compartilhado entre os workers; resultados de fallback de feriados nacionais expiram em 1 hora para que a FeriadosAPI seja tentada de novo, e falhas de feriados estaduais não são cacheadas.
 
 ## Diretrizes de desenvolvimento
 
