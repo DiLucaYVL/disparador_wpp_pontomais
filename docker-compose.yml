@@ -6,6 +6,10 @@ services:
     container_name: disparador-wpp
     env_file:
       - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
     ports:
       - "192.168.99.50:8000:8000"
     volumes:
@@ -13,6 +17,12 @@ services:
       - logs_data:/app/log
       - task_status_data:/app/task_status
       - ./secrets:/app/secrets:ro
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: disparador-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
     restart: unless-stopped
 
 volumes:

@@ -23,3 +23,15 @@ GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID", "").str
 GOOGLE_SHEETS_WORKSHEET = os.getenv("GOOGLE_SHEETS_WORKSHEET", "Dados").strip() or "Dados"
 GOOGLE_SHEETS_CREDENTIALS_FILE = os.getenv("GOOGLE_SHEETS_CREDENTIALS_FILE", "").strip()
 GOOGLE_SHEETS_CREDENTIALS_JSON = os.getenv("GOOGLE_SHEETS_CREDENTIALS_JSON", "").strip()
+
+# Planilha de lojas (mapeamento loja -> estado)
+GOOGLE_SHEETS_LOJA_ID = os.getenv("GOOGLE_SHEETS_LOJA_ID", "").strip()
+GOOGLE_SHEETS_LOJA_WORKSHEET = os.getenv("GOOGLE_SHEETS_LOJA_WORKSHEET", "").strip()
+GOOGLE_SHEETS_LOJA_PRIVATE_KEY = os.getenv("GOOGLE_SHEETS_LOJA_PRIVATE_KEY", "")
+GOOGLE_SHEETS_LOJA_SERVICE_ACCOUNT = os.getenv("GOOGLE_SHEETS_LOJA_SERVICE_ACCOUNT", "").strip()
+
+# FeriadosAPI (feriados nacionais e estaduais)
+FERIADOS_API_KEY = os.getenv("FERIADOS_API_KEY", "").strip()
+
+# Redis (cache diário de feriados e planilha de lojas); vazio = cache em memória
+REDIS_URL = os.getenv("REDIS_URL", "").strip()
