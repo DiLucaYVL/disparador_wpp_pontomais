@@ -28,6 +28,7 @@ from app.history import (
     STATUS_ENVIO_PARCIAL,
 )
 from app.history_export import gerar_planilha_historico
+from app.services.feriados import TIPOS_RELATORIO_COM_FERIADO, listar_feriados_df
 
 api_bp = Blueprint('api', __name__)
 UPLOAD_FOLDER = 'uploads'
@@ -238,6 +239,7 @@ def enviar():
         forcar_reenvio = request.form.get('forcarReenvio', 'false').lower() == 'true'
         apenas_gestor = request.form.get('apenasGestor', 'false').lower() == 'true'
         incluir_duplicadas = request.form.get('incluirDuplicadas', 'false').lower() == 'true'
+        incluir_feriados = request.form.get('incluirFeriados', 'true').lower() == 'true'
 
         if not file:
             return jsonify({"success": False, "log": ["⚠️ Nenhum arquivo CSV enviado."]}), 400
@@ -310,6 +312,7 @@ def enviar():
             equipes_permitidas=equipes_permitidas,
             apenas_gestor=apenas_gestor,
             incluir_duplicadas=incluir_duplicadas,
+            incluir_feriados=incluir_feriados,
         )
 
         return jsonify({
@@ -434,6 +437,8 @@ def obter_equipes():
         resposta = {"success": True, "equipes": equipes}
         if duplicidade is not None:
             resposta["duplicidade"] = duplicidade
+        if tipo_relatorio in TIPOS_RELATORIO_COM_FERIADO:
+            resposta["feriados"] = listar_feriados_df(df)
         return jsonify(resposta)
 
     except Exception as e:

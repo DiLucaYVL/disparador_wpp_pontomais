@@ -96,6 +96,7 @@ def enqueue_csv_processing(
     equipes_permitidas: Optional[set] = None,
     apenas_gestor: bool = False,
     incluir_duplicadas: bool = False,
+    incluir_feriados: bool = True,
 ) -> str:
     """Agenda o processamento do CSV em background."""
     task_id = uuid.uuid4().hex
@@ -125,6 +126,7 @@ def enqueue_csv_processing(
                 equipes_permitidas=equipes_permitidas,
                 apenas_gestor=apenas_gestor,
                 incluir_duplicadas=incluir_duplicadas,
+                incluir_feriados=incluir_feriados,
             )
 
             debug_data = None

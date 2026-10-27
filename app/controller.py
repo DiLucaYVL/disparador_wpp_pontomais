@@ -15,6 +15,12 @@ from app.whatsapp.numeros_equipes import carregar_numeros_equipes
 from app.processamento.log import configurar_log
 from app.processamento.mapear_gerencia import eh_loja
 from app.services.google_sheets import registrar_dataframe_no_sheets
+from app.services.feriados import (
+    TIPOS_RELATORIO_COM_FERIADO,
+    gerar_rodape_feriados,
+    identificar_feriados,
+    remover_datas_feriado,
+)
 from collections import defaultdict
 from datetime import datetime
 import logging
@@ -31,6 +37,7 @@ def processar_csv(
     equipes_permitidas=None,
     apenas_gestor=False,
     incluir_duplicadas=False,
+    incluir_feriados=True,
 ):
     nome_arquivo_log = configurar_log()
     logging.info(f">>> Iniciando processamento CSV: {caminho_csv}")
@@ -97,6 +104,25 @@ def processar_csv(
                             "já haviam sido enviadas anteriormente."
                         ),
                     })
+
+    ignoradas_feriado = 0
+    # O rodapé pede para desconsiderar feriados estaduais/municipais que a
+    # BrasilAPI não consegue mapear; só é omitido quando o usuário opta por
+    # incluir feriados nacionais detectados no relatório.
+    rodape_feriados = ""
+    if tipo_relatorio in TIPOS_RELATORIO_COM_FERIADO:
+        feriados_encontrados = identificar_feriados(df["Data"].dropna().unique()) if not df.empty else {}
+        if not (feriados_encontrados and incluir_feriados):
+            rodape_feriados = gerar_rodape_feriados()
+        if feriados_encontrados and not incluir_feriados:
+            total_antes = len(df)
+            df = remover_datas_feriado(df, feriados_encontrados)
+            ignoradas_feriado = total_antes - len(df)
+            if ignoradas_feriado:
+                logs.append({
+                    "type": "info",
+                    "message": f"{ignoradas_feriado} registro(s) ignorado(s): data de feriado.",
+                })
 
     nome_relatorio_chave = normalizar_nome_relatorio(nome_relatorio or nome_relatorio_original)
     nome_relatorio_exibicao = (nome_relatorio_original or nome_relatorio or nome_relatorio_chave or "relatorio_sem_nome").strip()
@@ -297,6 +323,8 @@ def processar_csv(
                         mensagem_final += f"• {m}\n"
                     mensagem_final += "\n"
 
+                mensagem_final += rodape_feriados
+
                 future = executor.submit(
                     enviar_whatsapp, numero, mensagem_final.strip(), equipe
                 )
@@ -410,6 +438,7 @@ def processar_csv(
     stats["pendencias"] = len(equipes_com_erro)
     stats["ignoradas_pendencia_colaborador"] = ignoradas_pendencia_colaborador
     stats["ignoradas_duplicadas"] = ignoradas_duplicadas
+    stats["ignoradas_feriado"] = ignoradas_feriado
 
     if nome_relatorio_chave:
         registrar_resultado_relatorio(
