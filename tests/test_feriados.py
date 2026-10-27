@@ -1,3 +1,4 @@
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -7,6 +8,8 @@ import requests
 from app.services import feriados
 from app.services.feriados import (
     buscar_feriados_ano,
+    calcular_feriados_locais,
+    calcular_pascoa,
     gerar_rodape_feriados,
     identificar_feriados,
     listar_feriados_df,
@@ -44,10 +47,50 @@ def test_buscar_feriados_ano_converte_datas_e_usa_cache():
     mock_get.assert_called_once()
 
 
-def test_buscar_feriados_ano_falha_retorna_vazio_sem_cachear():
+RESPOSTA_NAGER_2025 = [
+    {"date": "2025-07-09", "localName": "Revolução Constitucionalista de 1932", "global": False},
+    {"date": "2025-11-20", "localName": "Dia da Consciência Negra", "global": True},
+]
+
+
+def test_buscar_feriados_ano_usa_nager_quando_brasilapi_falha():
+    def fake_get(url, timeout):
+        if "brasilapi" in url:
+            raise requests.ConnectionError("offline")
+        return _mock_resposta(RESPOSTA_NAGER_2025)
+
+    with patch("app.services.feriados.requests.get", side_effect=fake_get):
+        resultado = buscar_feriados_ano(2025)
+
+    # Feriados estaduais (global=False) não entram.
+    assert resultado == {"20/11/2025": "Dia da Consciência Negra"}
+
+
+def test_buscar_feriados_ano_usa_calculo_local_quando_apis_falham():
     with patch("app.services.feriados.requests.get", side_effect=requests.ConnectionError("offline")):
-        assert buscar_feriados_ano(2025) == {}
-    assert 2025 not in feriados._cache_feriados
+        resultado = buscar_feriados_ano(2025)
+
+    assert resultado == calcular_feriados_locais(2025)
+    assert 2025 in feriados._cache_feriados
+
+
+def test_calcular_feriados_locais_igual_brasilapi_2025():
+    esperado = [
+        "01/01/2025", "03/03/2025", "04/03/2025", "18/04/2025", "20/04/2025",
+        "21/04/2025", "01/05/2025", "19/06/2025", "07/09/2025", "12/10/2025",
+        "02/11/2025", "15/11/2025", "20/11/2025", "25/12/2025",
+    ]
+    assert list(calcular_feriados_locais(2025)) == esperado
+
+
+def test_calcular_feriados_locais_consciencia_negra_a_partir_de_2024():
+    assert "20/11/2023" not in calcular_feriados_locais(2023)
+    assert "20/11/2024" in calcular_feriados_locais(2024)
+
+
+@pytest.mark.parametrize("ano, pascoa", [(2024, date(2024, 3, 31)), (2025, date(2025, 4, 20)), (2026, date(2026, 4, 5))])
+def test_calcular_pascoa(ano, pascoa):
+    assert calcular_pascoa(ano) == pascoa
 
 
 def test_identificar_feriados_filtra_datas_presentes():
