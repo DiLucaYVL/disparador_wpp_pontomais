@@ -278,6 +278,19 @@
         </div>
     </div>
 
+    <div id="confirmFeriadosModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmFeriadosTitulo">
+        <div class="modal-content">
+            <h4 id="confirmFeriadosTitulo">Datas de feriado no relatório</h4>
+            <p>O relatório contém registros nas seguintes datas de feriado nacional:</p>
+            <ul id="confirmFeriadosLista"></ul>
+            <p>O envio deve incluir as datas de feriado? Se não incluir, essas datas serão removidas e a mensagem terá um rodapé pedindo para desconsiderar feriados estaduais/municipais.</p>
+            <div class="modal-actions">
+                <button type="button" id="confirmFeriadosRemover" class="modal-button modal-button--secondary">Não incluir feriados</button>
+                <button type="button" id="confirmFeriadosIncluir" class="modal-button modal-button--primary">Incluir feriados</button>
+            </div>
+        </div>
+    </div>
+
 <!-- Scripts -->
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/api.js') }}"></script>

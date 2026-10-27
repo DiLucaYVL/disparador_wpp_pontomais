@@ -21,6 +21,10 @@ const modalSelecaoArquivo = document.getElementById('confirmSelecaoArquivoModal'
 const modalSelecaoCheckbox = document.getElementById('confirmSelecaoApenasGestor');
 const modalSelecaoContinuarBtn = document.getElementById('confirmSelecaoContinuar');
 const modalSelecaoCancelarBtn = document.getElementById('confirmSelecaoCancelar');
+const modalFeriados = document.getElementById('confirmFeriadosModal');
+const modalFeriadosLista = document.getElementById('confirmFeriadosLista');
+const modalFeriadosIncluirBtn = document.getElementById('confirmFeriadosIncluir');
+const modalFeriadosRemoverBtn = document.getElementById('confirmFeriadosRemover');
 
 const RELATORIO_STATUS = {
     NOVO: 'novo',
@@ -35,6 +39,8 @@ let reenvioConfirmado = false;
 let nomeRelatorioAtual = '';
 let duplicidadeInfo = null;
 let duplicidadeResposta = null;
+let feriadosInfo = [];
+let feriadosResposta = null;
 
 export function configurarEventos() {
     if (!arquivoInput || !sendButton) {
@@ -53,6 +59,12 @@ export function configurarEventos() {
     if (modalDuplicidadeTodasBtn) {
         modalDuplicidadeTodasBtn.addEventListener('click', () => resolverDuplicidade('todas'));
     }
+    if (modalFeriadosIncluirBtn) {
+        modalFeriadosIncluirBtn.addEventListener('click', () => resolverFeriados('incluir'));
+    }
+    if (modalFeriadosRemoverBtn) {
+        modalFeriadosRemoverBtn.addEventListener('click', () => resolverFeriados('remover'));
+    }
     if (modalSelecaoContinuarBtn) {
         modalSelecaoContinuarBtn.addEventListener('click', () => continuarSelecaoArquivo(true));
     }
@@ -63,6 +75,7 @@ export function configurarEventos() {
         modalOverlay.addEventListener('click', () => {
             fecharModalReenvio();
             fecharModalDuplicidade();
+            fecharModalFeriados();
             if (modalSelecaoArquivo && !modalSelecaoArquivo.classList.contains('hidden')) {
                 continuarSelecaoArquivo(false);
             }
@@ -135,6 +148,8 @@ async function tratarArquivoSelecionado() {
     nomeRelatorioAtual = arquivoSelecionado ? arquivoSelecionado.name : '';
     duplicidadeInfo = null;
     duplicidadeResposta = null;
+    feriadosInfo = [];
+    feriadosResposta = null;
 
     if (fileNameLabel) {
         if (arquivoSelecionado) {
@@ -208,6 +223,7 @@ async function tratarArquivoSelecionado() {
         if (data.success && Array.isArray(data.equipes)) {
             carregarDropdownEquipes(data.equipes);
             duplicidadeInfo = data.duplicidade || null;
+            feriadosInfo = Array.isArray(data.feriados) ? data.feriados : [];
         } else {
             alert('Erro desconhecido ao processar o CSV.');
         }
@@ -249,6 +265,11 @@ async function enviarRelatorio() {
         return;
     }
 
+    if (feriadosInfo.length > 0 && feriadosResposta === null) {
+        abrirModalFeriados(feriadosInfo);
+        return;
+    }
+
     if (sendButton) {
         sendButton.disabled = true;
     }
@@ -263,6 +284,7 @@ async function enviarRelatorio() {
 
     const forcarReenvio = statusRelatorioAtual === RELATORIO_STATUS.SUCESSO_TOTAL && reenvioConfirmado;
     const incluirDuplicadas = duplicidadeResposta === 'todas';
+    const incluirFeriados = feriadosResposta !== 'remover';
     const formData = gerarFormData(
         fileAtual,
         ignorarSabados,
@@ -272,6 +294,7 @@ async function enviarRelatorio() {
         forcarReenvio,
         apenasGestor,
         incluirDuplicadas,
+        incluirFeriados,
     );
 
     atualizarBarraProgresso('25%');
@@ -415,6 +438,37 @@ function fecharModalDuplicidade() {
 async function resolverDuplicidade(escolha) {
     duplicidadeResposta = escolha;
     fecharModalDuplicidade();
+    await enviarRelatorio();
+}
+
+function abrirModalFeriados(feriados) {
+    if (!modalOverlay || !modalFeriados) {
+        return;
+    }
+    if (modalFeriadosLista) {
+        modalFeriadosLista.replaceChildren(
+            ...feriados.map(({ data, nome }) => {
+                const item = document.createElement('li');
+                item.textContent = `${data} - ${nome}`;
+                return item;
+            }),
+        );
+    }
+    modalOverlay.classList.remove('hidden');
+    modalFeriados.classList.remove('hidden');
+}
+
+function fecharModalFeriados() {
+    if (!modalOverlay || !modalFeriados) {
+        return;
+    }
+    modalOverlay.classList.add('hidden');
+    modalFeriados.classList.add('hidden');
+}
+
+async function resolverFeriados(escolha) {
+    feriadosResposta = escolha;
+    fecharModalFeriados();
     await enviarRelatorio();
 }
 
