@@ -340,8 +340,8 @@ def remover_datas_feriado(
 def gerar_rodape_feriados() -> str:
     """Gera o rodapé em itálico (WhatsApp) pedindo para ignorar datas de feriado local.
 
-    Usado quando os feriados nacionais são excluídos do envio, já que feriados
-    estaduais/municipais não são mapeados pela BrasilAPI.
+    Incluído em todas as mensagens de Auditoria e Ocorrências, já que nem
+    todos os feriados estaduais/municipais são mapeados.
     """
     return (
         "_Obs.: Caso alguma das datas acima seja feriado estadual ou municipal "

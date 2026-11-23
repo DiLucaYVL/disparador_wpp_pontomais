@@ -108,15 +108,14 @@ def processar_csv(
 
     ignoradas_feriado = 0
     # O rodapé pede para desconsiderar feriados estaduais/municipais não
-    # mapeados; só é omitido quando o usuário opta por incluir os feriados
-    # (nacionais ou estaduais) detectados no relatório.
+    # mapeados e vai em todas as mensagens de Auditoria e Ocorrências, mesmo
+    # quando o usuário opta por incluir os feriados detectados no relatório.
     rodape_feriados = ""
     if tipo_relatorio in TIPOS_RELATORIO_COM_FERIADO:
+        rodape_feriados = gerar_rodape_feriados()
         feriados_encontrados = identificar_feriados(df["Data"].dropna().unique()) if not df.empty else {}
         feriados_estaduais = identificar_feriados_estaduais(df)
         houve_feriado = bool(feriados_encontrados or feriados_estaduais)
-        if not (houve_feriado and incluir_feriados):
-            rodape_feriados = gerar_rodape_feriados()
         if houve_feriado and not incluir_feriados:
             total_antes = len(df)
             df = remover_datas_feriado(df, feriados_encontrados, feriados_estaduais)

@@ -170,12 +170,12 @@ def _executar_controller(incluir_feriados, df=None):
     return mock_enviar, stats
 
 
-def test_controller_inclui_feriado_sem_rodape():
+def test_controller_inclui_feriado_com_rodape():
     mock_enviar, stats = _executar_controller(incluir_feriados=True)
 
     mensagem = mock_enviar.call_args[0][1]
     assert "NO DIA 20/11/2025" in mensagem
-    assert "_Obs.:" not in mensagem
+    assert mensagem.endswith(gerar_rodape_feriados())
     assert stats["ignoradas_feriado"] == 0
 
 
